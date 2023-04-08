@@ -94,14 +94,54 @@ void reference_init( reference_ptr ref )
 
 void reference_clear( reference_ptr ref )
 {
-    if(reference_countable_type(ref[ref_val_head]))
+    switch (ref[ref_val_head])
     {
-        refable_ptr tmp = (refable_ptr)ref[ref_val_data];
-        --(tmp[refable_refcnt_idx]);
-        if(tmp[refable_refcnt_idx] < 1)
+        // case SESC_TYPE_OBJ   :
+        // {
+        //     refable_ptr tmp = (refable_ptr)ref[ref_val_data];
+        //     --(tmp[refable_refcnt_idx]);
+        //     if(tmp[refable_refcnt_idx] < 1)
+        //     {
+        //         //oject_destroy(tmp);
+        //     }
+        //     break;
+        // }
+        // case SESC_TYPE_LIST  :
+        // {
+        //     refable_ptr tmp = (refable_ptr)ref[ref_val_data];
+        //     --(tmp[refable_refcnt_idx]);
+        //     if(tmp[refable_refcnt_idx] < 1)
+        //     {
+        //         //list_destroy(tmp);
+        //     }
+        //     break;
+        // }
+        // case SESC_TYPE_FUNC  :
+        // {
+        //     refable_ptr tmp = (refable_ptr)ref[ref_val_data];
+        //     --(tmp[refable_refcnt_idx]);
+        //     if(tmp[refable_refcnt_idx] < 1)
+        //     {
+        //         //func_destroy(tmp);
+        //     }
+        //     break;
+        // }
+
+        case SESC_TYPE_STR   :
+        case SESC_TYPE_BYTES :
         {
-            free(tmp);
+            //simple free
+            refable_ptr tmp = (refable_ptr)ref[ref_val_data];
+            --(tmp[refable_refcnt_idx]);
+            if(tmp[refable_refcnt_idx] < 1)
+            {
+                free(tmp);
+            }
+            break;
         }
+        // case SESC_TYPE_NONE  :
+        // case SESC_TYPE_BOOL  :
+        // case SESC_TYPE_INT   :
     }
     ref[ref_val_head]=SESC_TYPE_NONE;
     ref[ref_val_data]=0;
