@@ -14,7 +14,10 @@
 
 #else
 
+#include<stdlib.h>
 #include<inttypes.h>
+#include<string.h>
+#include<stdbool.h>
 #define SIZEOFINT sizeof(intptr_t)
 
 #endif
