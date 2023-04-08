@@ -2,7 +2,23 @@
 
 
 #define SESC_TYPE_NONE          0
-#define SESC_TYPE_STR           2
+#define SESC_TYPE_BOOL          1
+#define SESC_TYPE_INT           2
+#define SESC_TYPE_STR           3
+#define SESC_TYPE_BYTES         4
+#define SESC_TYPE_OBJ           5
+#define SESC_TYPE_LIST          6
+#define SESC_TYPE_FUNC          7
+
+        // case SESC_TYPE_NONE  :
+        // case SESC_TYPE_BOOL  :
+        // case SESC_TYPE_INT   :
+        // case SESC_TYPE_STR   :
+        // case SESC_TYPE_BYTES :
+        // case SESC_TYPE_OBJ   :
+        // case SESC_TYPE_LIST  :
+        // case SESC_TYPE_FUNC  :
+
 #define SESC_TYPE_STATIC_STR    0x12
 #define SESC_TYPE_SUBTABLE      0x11
 #define SESC_TYPE intptr_t
@@ -42,28 +58,25 @@
 #define htable_size (htable_len * ht_item_size)
 
 const intptr_t REFERENCE_NONE[reference_len] = { SESC_TYPE_NONE, 0 };
+#define NONE_HASH 0
 
 
-unsigned char hash_bytes( const char* data, intptr_t len, char seed )
-{
-    //input seeds will probably be sequential so spin them once
-    intptr_t sum  =  (0xfff1 * ((intptr_t)seed+1));
-    while( len-- > 0 )
-    {
-        intptr_t tmp = *data++;
-        // might be faster without native multiply sum = ((sum << 1) + sum) ^ ((tmp << 5) - tmp);
-        sum = (3 * sum) ^ (31 * tmp);
-    }
-    return sum;
-}
+
 
 bool reference_countable_type( SESC_TYPE type )
 {
     switch (type)
     {
-        case SESC_TYPE_STR:
+        case SESC_TYPE_STR   :
+        case SESC_TYPE_BYTES :
+        // case SESC_TYPE_OBJ   :
+        // case SESC_TYPE_LIST  :
+        // case SESC_TYPE_FUNC  :
             return true;
 
+        // case SESC_TYPE_NONE  :
+        // case SESC_TYPE_BOOL  :
+        // case SESC_TYPE_INT   :
     }
     return false;
 }
@@ -118,6 +131,45 @@ void reference_copy( reference_ptr dst_ref, const reference_ptr src_ref )
     }
 }
 
+void reference_deep_copy( reference_ptr dst_ref, const reference_ptr src_ref )
+{
+
+
+    // TKOTZ FINISH THIS FUNCTION
+
+
+    if( dst_ref!=src_ref )
+    {
+        switch (src_ref[ref_val_head])
+        {
+            case SESC_TYPE_NONE  :
+                reference_clear(dst_ref);
+
+            case SESC_TYPE_BOOL  :
+            case SESC_TYPE_INT   :
+                // shallow copy works fine
+                return reference_copy( dst_ref, src_ref );
+
+            case SESC_TYPE_OBJ   :
+            case SESC_TYPE_LIST  :
+            case SESC_TYPE_FUNC  :
+            {
+                // copy the objects
+                return;
+            }
+
+            case SESC_TYPE_STR   :
+            case SESC_TYPE_BYTES :
+            {
+                // copy the data
+                //refable_ptr data=(refable_ptr)ref[ref_val_data];
+                return ;
+            }
+        }
+        //reference_set_refable( dst_ref, src_ref[ref_val_head], (refable_ptr)src_ref[ref_val_data] );
+    }
+}
+
 void reference_move( reference_ptr dst_ref, reference_ptr src_ref)
 {
     if( dst_ref!=src_ref )
@@ -130,16 +182,15 @@ void reference_move( reference_ptr dst_ref, reference_ptr src_ref)
     }
 }
 
-void reference_create_str( reference_ptr ref, const char * str )
+void reference_create_byteslike( reference_ptr ref, const char * bytes, intptr_t len, intptr_t val_head)
 {
-    intptr_t len = strlen(str)+1;
     refable_ptr data= malloc(refable_header_size+SIZEOFINT+len);
     if( data != NULL )
     {
         refable_header_init( data );
         data[refable_str_len_idx] = len;
-        strncpy ( (char*)&data[refable_str_bytes_idx], str, len);
-        reference_set_refable(  ref, SESC_TYPE_STR, data );
+        memcpy ( (char*)&data[refable_str_bytes_idx], bytes, len);
+        reference_set_refable(  ref, val_head, data );
     }
     else
     {
@@ -147,17 +198,164 @@ void reference_create_str( reference_ptr ref, const char * str )
     }
 }
 
-const char * reference_extract_str( const reference_ptr ref )
+void reference_create_bytes( reference_ptr ref, const char * bytes, intptr_t len )
 {
-    if( SESC_TYPE_STR != ref[ref_val_head])
+    return reference_create_byteslike( ref, bytes, len, SESC_TYPE_BYTES);
+}
+
+const char* reference_extract_bytes( const reference_ptr ref, intptr_t* return_len)
+{
+    switch (ref[ref_val_head])
     {
-        return "";
+        case SESC_TYPE_NONE  :
+            *return_len = 0;
+            return NULL;
+
+        case SESC_TYPE_BOOL  :
+        case SESC_TYPE_INT   :
+        case SESC_TYPE_OBJ   :
+        case SESC_TYPE_LIST  :
+        case SESC_TYPE_FUNC  :
+        {
+            *return_len = SIZEOFINT;
+            return (char*)&ref[ref_val_data];
+        }
+
+        case SESC_TYPE_STR   :
+        case SESC_TYPE_BYTES :
+        {
+            refable_ptr data=(refable_ptr)ref[ref_val_data];
+            *return_len = data[refable_str_len_idx];
+            return (char*)&data[refable_str_bytes_idx];
+        }
+
     }
-    else
+    fputs("reference_extract_bytes():Unknown Type", stderr);
+    *return_len = reference_size;
+    return (char*)ref;
+}
+
+void reference_create_str( reference_ptr ref, const char * str )
+{
+    return reference_create_byteslike( ref, str, strlen(str)+1, SESC_TYPE_STR);
+}
+
+const char* reference_extract_str( const reference_ptr ref )
+{
+    switch (ref[ref_val_head])
     {
-        refable_ptr data=(refable_ptr)ref[ref_val_data];
-        return (char*)&data[refable_str_bytes_idx];
+        case SESC_TYPE_NONE:
+        {
+            return "None";
+        }
+
+        case SESC_TYPE_BOOL  :
+        {
+            if(ref[ref_val_data])
+            {
+                return "True";
+            }
+            else
+            {
+                return "False";
+            }
+        }
+
+        case SESC_TYPE_INT   :
+        {
+            return "int";
+        }
+        case SESC_TYPE_STR   :
+        {
+            refable_ptr data=(refable_ptr)ref[ref_val_data];
+            return (char*)&data[refable_str_bytes_idx];
+        }
+        case SESC_TYPE_BYTES :
+        {
+            return "bytes";
+        }
+        case SESC_TYPE_OBJ   :
+        {
+            return "object";
+        }
+        case SESC_TYPE_LIST  :
+        {
+            return "list";
+        }
+        case SESC_TYPE_FUNC  :
+        {
+            return "func";
+        }
     }
+    fputs("reference_extract_str():Unknown Type", stderr);
+    return "Unknown Type";
+}
+
+void reference_create_int( reference_ptr ref, intptr_t val )
+{
+    reference_clear(ref);
+    ref[ref_val_head]=SESC_TYPE_INT;
+    ref[ref_val_data]=val;
+}
+
+intptr_t reference_extract_int( reference_ptr ref )
+{
+    return ref[ref_val_data];
+}
+
+void reference_create_bool( reference_ptr ref, intptr_t val )
+{
+    reference_clear(ref);
+    ref[ref_val_head]=SESC_TYPE_BOOL;
+    ref[ref_val_data]=(0!=val);
+}
+
+intptr_t reference_extract_bool( reference_ptr ref )
+{
+    return (0!=ref[ref_val_data]);
+}
+
+static unsigned char hash_bytes( const char* data, intptr_t len, char seed )
+{
+    //input seeds will probably be sequential so spin them once
+    intptr_t sum  =  (0xfff1 * ((intptr_t)seed+1));
+    while( len-- > 0 )
+    {
+        intptr_t tmp = *data++;
+        // might be faster without native multiply sum = ((sum << 1) + sum) ^ ((tmp << 5) - tmp);
+        sum = (3 * sum) ^ (31 * tmp);
+    }
+    return sum;
+}
+
+unsigned char reference_hash( const reference_ptr ref, char seed )
+{
+    switch (ref[ref_val_head])
+    {
+        case SESC_TYPE_NONE  :
+            return NONE_HASH;
+
+        case SESC_TYPE_BOOL  :
+        case SESC_TYPE_INT   :
+        case SESC_TYPE_OBJ   :
+        case SESC_TYPE_LIST  :
+        case SESC_TYPE_FUNC  :
+        {
+            // hash the reference
+            return hash_bytes( (const char*)ref, reference_size, seed );
+        }
+
+        case SESC_TYPE_STR   :
+        case SESC_TYPE_BYTES :
+        {
+            // hash the data
+            refable_ptr data=(refable_ptr)ref[ref_val_data];
+            return hash_bytes( (char*)&data[refable_str_bytes_idx], data[refable_str_len_idx], seed );
+        }
+    }
+    fputs("reference_hash():Unknown Type", stderr);
+    // hash the reference
+    return hash_bytes( (const char*)ref, reference_size, seed );
 }
 
 
@@ -350,10 +548,41 @@ void main()
         reference_clear( ref );
     }
 
-    for( int i=3; i < num_strs; ++i )
+    for( int i=0; i < num_strs; ++i )
     {
         int len = strlen(strs[i]);
         printf( "a.%s = \"%s\"\n", strs[i], reference_extract_str( htable_get_item(htable, strs[i], len, 0 ) ) );
+    }
+
+    for( int i=5; i < num_strs; ++i )
+    {
+        int len = strlen(strs[i]);
+        reference_create_str( ref, strs[i-5] );
+        htable_set_item( htable, strs[i], len, ref, 0 );
+        reference_clear( ref );
+    }
+
+    for( int i=0; i < num_strs; ++i )
+    {
+        int len = strlen(strs[i]);
+        printf( "a.%s = \"%s\"\n", strs[i], reference_extract_str( htable_get_item(htable, strs[i], len, 0 ) ) );
+    }
+
+    for( intptr_t i=0; i < 10; ++i )
+    {
+        printf( "a[%d] = \"%s\"\n", (int)i, reference_extract_str( htable_get_item(htable, (char*)&i, sizeof(intptr_t), 0 ) ) );
+    }
+
+    for( intptr_t i=0; i < num_strs; ++i )
+    {
+        reference_create_str( ref, strs[i] );
+        htable_set_item( htable, (char*)&i, sizeof(intptr_t), ref, 0 );
+        reference_clear( ref );
+    }
+
+    for( intptr_t i=0; i < 10; ++i )
+    {
+        printf( "a[%d] = \"%s\"\n", (int)i, reference_extract_str( htable_get_item(htable, (char*)&i, sizeof(intptr_t), 0 ) ) );
     }
 
 
