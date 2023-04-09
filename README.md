@@ -15,8 +15,8 @@ Design Goals
     - every thing should behave symmetrically
     - ranges should act like lists
 - Inspirations
-    - Duktape
     - Javascript
+        - Duktape
     - Lua
     - Python
 

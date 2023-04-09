@@ -1,6 +1,12 @@
-#include "smallc.h"
 
 
+/* Includes ******************************************************************/
+#include "hashtable.h"
+
+/* Defines *******************************************************************/
+#define NONE_HASH 0
+
+// enum SESC_TYPE
 #define SESC_TYPE_NONE          0
 #define SESC_TYPE_BOOL          1
 #define SESC_TYPE_INT           2
@@ -23,15 +29,20 @@
 #define SESC_TYPE_SUBTABLE      0x11
 #define SESC_TYPE intptr_t
 
+
+/* Types *********************************************************************/
+// struct refable
 #define refable_ptr           intptr_t*
 #define refable_refcnt_idx    0
 #define refable_data_idx      1
 #define refable_header_size   (refable_data_idx*SIZEOFINT)
 
-#define refable_str_len_idx   refable_data_idx
-#define refable_str_bytes_idx (refable_data_idx+1)
+// struct refable_str or refable_bytes
+#define refable_bytes_len_idx       refable_data_idx
+#define refable_bytes_data_idx      (refable_data_idx+1)
+#define refable_bytes_header_size   (refable_bytes_data_idx*SIZEOFINT)
 
-
+// struct reference
 #define reference_ptr       intptr_t*
 #define ref_val_head        0
 #define ref_val_data        1
@@ -57,13 +68,21 @@
 #define htable_len 256
 #define htable_size (htable_len * ht_item_size)
 
+// struct refable_list or refable_object
+#define refable_htable_data_idx  refable_data_idx
+#define refable_htable_idx_cnt   (refable_data_idx+htable_len)
+#define refable_htable_size      (refable_htable_data_idx*SIZEOFINT+htable_size)
+
+/* Interfaces ****************************************************************/
+
+/* Data **********************************************************************/
 const intptr_t REFERENCE_NONE[reference_len] = { SESC_TYPE_NONE, 0 };
-#define NONE_HASH 0
 
 
 intptr_t max_seed = 0;
 
 
+/* Functions *****************************************************************/
 
 
 bool reference_countable_type( SESC_TYPE type )
@@ -95,6 +114,7 @@ void reference_init( reference_ptr ref )
     ref[ref_val_data]=0;
 }
 
+/** Reference Destroy Functions **********************************************/
 void reference_clear( reference_ptr ref )
 {
     switch (ref[ref_val_head])
@@ -187,14 +207,15 @@ void reference_move( reference_ptr dst_ref, reference_ptr src_ref)
 }
 
 
-void reference_create_byteslike( reference_ptr ref, const char * bytes, intptr_t len, intptr_t val_head)
+/** Reference Create Functions ***********************************************/
+void reference_create_byteslike( reference_ptr ref, const char * bytes, intptr_t len, SESC_TYPE val_head)
 {
-    refable_ptr data= malloc(refable_header_size+SIZEOFINT+len);
+    refable_ptr data= malloc(refable_bytes_header_size+len);
     if( data != NULL )
     {
         refable_header_init( data );
-        data[refable_str_len_idx] = len;
-        memcpy ( (char*)&data[refable_str_bytes_idx], bytes, len);
+        data[refable_bytes_len_idx] = len;
+        memcpy ( (char*)&data[refable_bytes_data_idx], bytes, len);
         reference_set_refable(  ref, val_head, data );
     }
     else
@@ -208,6 +229,26 @@ void reference_create_bytes( reference_ptr ref, const char * bytes, intptr_t len
     return reference_create_byteslike( ref, bytes, len, SESC_TYPE_BYTES);
 }
 
+void reference_create_str( reference_ptr ref, const char * str )
+{
+    return reference_create_byteslike( ref, str, strlen(str)+1, SESC_TYPE_STR);
+}
+
+void reference_create_int( reference_ptr ref, intptr_t val )
+{
+    reference_clear(ref);
+    ref[ref_val_head]=SESC_TYPE_INT;
+    ref[ref_val_data]=val;
+}
+
+void reference_create_bool( reference_ptr ref, intptr_t val )
+{
+    reference_clear(ref);
+    ref[ref_val_head]=SESC_TYPE_BOOL;
+    ref[ref_val_data]=(0!=val);
+}
+
+/** Reference Extract Functions **********************************************/
 const char* reference_extract_bytes( const reference_ptr ref, intptr_t* return_len)
 {
     switch (ref[ref_val_head])
@@ -230,14 +271,75 @@ const char* reference_extract_bytes( const reference_ptr ref, intptr_t* return_l
         case SESC_TYPE_BYTES :
         {
             refable_ptr data=(refable_ptr)ref[ref_val_data];
-            *return_len = data[refable_str_len_idx];
-            return (char*)&data[refable_str_bytes_idx];
+            *return_len = data[refable_bytes_len_idx];
+            return (char*)&data[refable_bytes_data_idx];
         }
 
     }
     fputs("reference_extract_bytes():Unknown Type", stderr);
     *return_len = reference_size;
     return (char*)ref;
+}
+
+const char* reference_extract_str( const reference_ptr ref )
+{
+    switch (ref[ref_val_head])
+    {
+        case SESC_TYPE_NONE:
+        {
+            return "None";
+        }
+
+        case SESC_TYPE_BOOL  :
+        {
+            if(ref[ref_val_data])
+            {
+                return "True";
+            }
+            else
+            {
+                return "False";
+            }
+        }
+
+        case SESC_TYPE_INT   :
+        {
+            return "int";
+        }
+        case SESC_TYPE_STR   :
+        {
+            refable_ptr data=(refable_ptr)ref[ref_val_data];
+            return (char*)&data[refable_bytes_data_idx];
+        }
+        case SESC_TYPE_BYTES :
+        {
+            return "bytes";
+        }
+        case SESC_TYPE_OBJ   :
+        {
+            return "object";
+        }
+        case SESC_TYPE_LIST  :
+        {
+            return "list";
+        }
+        case SESC_TYPE_FUNC  :
+        {
+            return "func";
+        }
+    }
+    fputs("reference_extract_str():Unknown Type", stderr);
+    return "Unknown Type";
+}
+
+intptr_t reference_extract_int(const reference_ptr ref )
+{
+    return ref[ref_val_data];
+}
+
+intptr_t reference_extract_bool(const reference_ptr ref )
+{
+    return (0!=ref[ref_val_data]);
 }
 
 void reference_deep_copy( reference_ptr dst_ref, const reference_ptr src_ref )
@@ -276,86 +378,6 @@ void reference_deep_copy( reference_ptr dst_ref, const reference_ptr src_ref )
     }
 }
 
-void reference_create_str( reference_ptr ref, const char * str )
-{
-    return reference_create_byteslike( ref, str, strlen(str)+1, SESC_TYPE_STR);
-}
-
-const char* reference_extract_str( const reference_ptr ref )
-{
-    switch (ref[ref_val_head])
-    {
-        case SESC_TYPE_NONE:
-        {
-            return "None";
-        }
-
-        case SESC_TYPE_BOOL  :
-        {
-            if(ref[ref_val_data])
-            {
-                return "True";
-            }
-            else
-            {
-                return "False";
-            }
-        }
-
-        case SESC_TYPE_INT   :
-        {
-            return "int";
-        }
-        case SESC_TYPE_STR   :
-        {
-            refable_ptr data=(refable_ptr)ref[ref_val_data];
-            return (char*)&data[refable_str_bytes_idx];
-        }
-        case SESC_TYPE_BYTES :
-        {
-            return "bytes";
-        }
-        case SESC_TYPE_OBJ   :
-        {
-            return "object";
-        }
-        case SESC_TYPE_LIST  :
-        {
-            return "list";
-        }
-        case SESC_TYPE_FUNC  :
-        {
-            return "func";
-        }
-    }
-    fputs("reference_extract_str():Unknown Type", stderr);
-    return "Unknown Type";
-}
-
-void reference_create_int( reference_ptr ref, intptr_t val )
-{
-    reference_clear(ref);
-    ref[ref_val_head]=SESC_TYPE_INT;
-    ref[ref_val_data]=val;
-}
-
-intptr_t reference_extract_int(const reference_ptr ref )
-{
-    return ref[ref_val_data];
-}
-
-void reference_create_bool( reference_ptr ref, intptr_t val )
-{
-    reference_clear(ref);
-    ref[ref_val_head]=SESC_TYPE_BOOL;
-    ref[ref_val_data]=(0!=val);
-}
-
-intptr_t reference_extract_bool(const reference_ptr ref )
-{
-    return (0!=ref[ref_val_data]);
-}
-
 intptr_t reference_cmp( const reference_ptr l_ref, const reference_ptr r_ref )
 {
     if(l_ref[ref_val_head] != r_ref[ref_val_head])
@@ -379,20 +401,22 @@ intptr_t reference_cmp( const reference_ptr l_ref, const reference_ptr r_ref )
         {
            refable_ptr r_data=(refable_ptr)r_ref[ref_val_data];
            refable_ptr l_data=(refable_ptr)l_ref[ref_val_data];
-           intptr_t r_len = r_data[refable_str_len_idx];
-           if( r_len != l_data[refable_str_len_idx] )
+           intptr_t r_len = r_data[refable_bytes_len_idx];
+           if( r_len != l_data[refable_bytes_len_idx] )
            {
                return -100;
            }
            else
            {
-               return memcmp((char*)&r_data[refable_str_bytes_idx], (char*)&l_data[refable_str_bytes_idx], r_len);
+               return memcmp((char*)&r_data[refable_bytes_data_idx], (char*)&l_data[refable_bytes_data_idx], r_len);
            }
         }
     }
     fputs("reference_cmp():Unknown Type", stderr);
     return -100;
 }
+
+/** Hash Table Functions *****************************************************/
 
 static unsigned char hash_bytes( const char* data, intptr_t len, char seed )
 {
@@ -455,15 +479,13 @@ unsigned char reference_hash( const reference_ptr ref, char seed )
         {
             // hash the data
             refable_ptr data=(refable_ptr)ref[ref_val_data];
-            return hash_bytes( (char*)&data[refable_str_bytes_idx], data[refable_str_len_idx], seed);
+            return hash_bytes( (char*)&data[refable_bytes_data_idx], data[refable_bytes_len_idx], seed);
         }
     }
     fputs("reference_hash():Unknown Type", stderr);
     // hash the reference
     return hash_bytes( (const char*)ref, reference_size, seed );
 }
-
-
 
 htable_ptr htable_create(void)
 {
@@ -543,6 +565,18 @@ const reference_ptr htable_get_item ( htable_ptr table, const reference_ptr key_
 }
 
 
+
+// TODO - TKOTZ
+// Add htable_destroy cleanup function
+// Make a hashtable refable so that it can be used for object and/or list.
+// Add reference_create_htable
+// should refernce htable replace SUBTABLE?
+
+
+/*****************************************************************************/
+/** Main     *****************************************************************/
+/*****************************************************************************/
+#ifdef HASHTEST
 void main()
 {
     const char * const strs[] = {
@@ -628,6 +662,7 @@ void main()
     intptr_t ref[reference_len];
     intptr_t key_ref[reference_len];
     reference_init(ref);
+    reference_init(key_ref);
 
 
 
@@ -709,12 +744,7 @@ void main()
     }
 }
 
-
-// Add htable_destroy cleanup function
-// Make a hashtable refable so that it can be used for object and/or list.
-// Add reference_create_htable
-// should refernce htable replace SUBTABLE?
-
+#endif // HASHTEST
 
 
 
