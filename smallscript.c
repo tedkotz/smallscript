@@ -58,7 +58,8 @@ typedef int* sscript_Object;
 
 typedef struct reference
 {
-    intptr_t
+    intptr_t head;
+    intptr_t data;
 } reference;
 
 struct sscript_attr

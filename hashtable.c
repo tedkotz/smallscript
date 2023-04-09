@@ -61,6 +61,9 @@ const intptr_t REFERENCE_NONE[reference_len] = { SESC_TYPE_NONE, 0 };
 #define NONE_HASH 0
 
 
+intptr_t max_seed = 0;
+
+
 
 
 bool reference_countable_type( SESC_TYPE type )
@@ -171,45 +174,6 @@ void reference_copy( reference_ptr dst_ref, const reference_ptr src_ref )
     }
 }
 
-void reference_deep_copy( reference_ptr dst_ref, const reference_ptr src_ref )
-{
-
-
-    // TKOTZ FINISH THIS FUNCTION
-
-
-    if( dst_ref!=src_ref )
-    {
-        switch (src_ref[ref_val_head])
-        {
-            case SESC_TYPE_NONE  :
-                reference_clear(dst_ref);
-
-            case SESC_TYPE_BOOL  :
-            case SESC_TYPE_INT   :
-                // shallow copy works fine
-                return reference_copy( dst_ref, src_ref );
-
-            case SESC_TYPE_OBJ   :
-            case SESC_TYPE_LIST  :
-            case SESC_TYPE_FUNC  :
-            {
-                // copy the objects
-                return;
-            }
-
-            case SESC_TYPE_STR   :
-            case SESC_TYPE_BYTES :
-            {
-                // copy the data
-                //refable_ptr data=(refable_ptr)ref[ref_val_data];
-                return ;
-            }
-        }
-        //reference_set_refable( dst_ref, src_ref[ref_val_head], (refable_ptr)src_ref[ref_val_data] );
-    }
-}
-
 void reference_move( reference_ptr dst_ref, reference_ptr src_ref)
 {
     if( dst_ref!=src_ref )
@@ -273,6 +237,42 @@ const char* reference_extract_bytes( const reference_ptr ref, intptr_t* return_l
     fputs("reference_extract_bytes():Unknown Type", stderr);
     *return_len = reference_size;
     return (char*)ref;
+}
+
+void reference_deep_copy( reference_ptr dst_ref, const reference_ptr src_ref )
+{
+    if( dst_ref!=src_ref )
+    {
+        switch (src_ref[ref_val_head])
+        {
+            case SESC_TYPE_NONE  :
+                reference_clear(dst_ref);
+
+            case SESC_TYPE_BOOL  :
+            case SESC_TYPE_INT   :
+                // shallow copy works fine
+                return reference_copy( dst_ref, src_ref );
+
+            case SESC_TYPE_OBJ   :
+            case SESC_TYPE_LIST  :
+            case SESC_TYPE_FUNC  :
+            {
+                // TKOTZ - copy the objects someday?
+                // shallow copy works fine?
+                return reference_copy( dst_ref, src_ref );
+            }
+
+            case SESC_TYPE_STR   :
+            case SESC_TYPE_BYTES :
+            {
+                // copy the data
+                //refable_ptr data=(refable_ptr)ref[ref_val_data]
+                intptr_t len;
+                const char * bytes = reference_extract_bytes(src_ref, &len);
+                return reference_create_byteslike(dst_ref, bytes, len, src_ref[ref_val_head]);
+            }
+        }
+    }
 }
 
 void reference_create_str( reference_ptr ref, const char * str )
@@ -357,20 +357,46 @@ intptr_t reference_extract_bool( reference_ptr ref )
 
 static unsigned char hash_bytes( const char* data, intptr_t len, char seed )
 {
-    //input seeds will probably be sequential so spin them once
-    intptr_t sum  =  (0xfff1 * ((intptr_t)seed+1));
-    while( len-- > 0 )
+    // Need a good 8-bit hash value. Let's try the family of CRCs.
+    // So let's use a 10-bit polynomial with the 8 seed bits being the middle terms
+    // Note the terms here are bit 6 represents x^0 and
+    // x^9 is assumed to be one by checking it before the shift
+    // poly  15  14  13  12  11  10  09  08  07  06  05  04  03  02  01  00
+    // seed      b7  b6  b5  b4  b3  b2  b1  b0
+    // 1<<6                                      1
+    // term      x^8 x^7 x^6 x^5 x^4 x^3 x^2 x^1 x^0
+    intptr_t poly = (1 << 6) + (seed <<7) ;
+
+    intptr_t accum = 0xFF00;
+    char i;
+    while( len-- > 0)
     {
-        intptr_t tmp = *data++;
-        // might be faster without native multiply sum = ((sum << 1) + sum) ^ ((tmp << 5) - tmp);
-        sum = (3 * sum) ^ (31 * tmp);
+        accum ^= (*data++ & 0x0FF);
+        i=8;
+        while(i-- > 0)
+        {
+            // Might be faster on sys without native multiply or branch prediction
+            // if( accum & 0x8000 ) accum ^= poly;
+            accum ^= (poly * ((accum >> 15) & 1));
+            accum <<= 1;
+        }
     }
-    return sum;
+    i=8;
+    while(i-- > 0)
+    {
+        // Might be faster on sys without native multiply or branch prediction
+        // if( accum & 0x8000 ) accum ^= poly;
+        accum ^= (poly * ((accum >> 15) & 1));
+        accum <<= 1;
+    }
+    return (accum >> 6) & 0x0FF;
 }
 
 unsigned char reference_hash( const reference_ptr ref, char seed )
 {
-    switch (ref[ref_val_head])
+    char type = ref[ref_val_head];
+    seed += type;
+    switch (type)
     {
         case SESC_TYPE_NONE  :
             return NONE_HASH;
@@ -382,7 +408,7 @@ unsigned char reference_hash( const reference_ptr ref, char seed )
         case SESC_TYPE_FUNC  :
         {
             // hash the reference
-            return hash_bytes( (const char*)ref, reference_size, seed );
+            return hash_bytes( (const char*)ref, reference_size, seed);
         }
 
         case SESC_TYPE_STR   :
@@ -390,7 +416,7 @@ unsigned char reference_hash( const reference_ptr ref, char seed )
         {
             // hash the data
             refable_ptr data=(refable_ptr)ref[ref_val_data];
-            return hash_bytes( (char*)&data[refable_str_bytes_idx], data[refable_str_len_idx], seed );
+            return hash_bytes( (char*)&data[refable_str_bytes_idx], data[refable_str_len_idx], seed);
         }
     }
     fputs("reference_hash():Unknown Type", stderr);
@@ -408,6 +434,7 @@ htable_ptr htable_create(void)
 void htable_set_item( htable_ptr table, const char* key_ptr, intptr_t key_len, const reference_ptr src_ref, char seed)
 {
     unsigned hash = hash_bytes(key_ptr, key_len, seed);
+    //hash =  ((hash >> 2) ^ hash) & 63;
     ht_item_ptr entry = table + (ht_item_len * hash);
 
     if (entry[ht_item_val_head] == SESC_TYPE_NONE)
@@ -437,9 +464,14 @@ void htable_set_item( htable_ptr table, const char* key_ptr, intptr_t key_len, c
         // Replace
         reference_copy( &entry[ht_item_val_head], src_ref);
     }
-    else
+    else if (seed+1 != 0)
     {
         // Collision
+        if (seed > max_seed)
+        {
+            max_seed = seed;
+            printf("Max Seed %d\n", (int)max_seed);
+        }
 
         htable_ptr tmp = htable_create();
 
@@ -453,11 +485,16 @@ void htable_set_item( htable_ptr table, const char* key_ptr, intptr_t key_len, c
 
         return htable_set_item( (htable_ptr)entry[ht_item_val_data], key_ptr, key_len, src_ref, seed+1);
     }
+    else
+    {
+        fputs("htable_set_item():Failed to store", stderr);
+    }
 }
 
 const reference_ptr htable_get_item ( htable_ptr table, const char* key_ptr, intptr_t key_len, char seed)
 {
     unsigned hash = hash_bytes(key_ptr, key_len, seed);
+    //hash =  ((hash >> 2) ^ hash) & 63;
     ht_item_ptr entry = table + (ht_item_len * hash);
 
     if (entry[ht_item_val_head] == SESC_TYPE_SUBTABLE)
@@ -615,11 +652,21 @@ void main()
 
     for( intptr_t i=0; i < num_strs; ++i )
     {
+        printf("adding %d\n", (int)i);
         reference_create_str( ref, strs[i] );
         htable_set_item( htable, (char*)&i, sizeof(intptr_t), ref, 0 );
         reference_clear( ref );
     }
 
+    reference_create_str( ref, "Ted" );
+    for( intptr_t i=num_strs; i < 0xFFFF; ++i )
+    {
+        htable_set_item( htable, (char*)&i, sizeof(intptr_t), ref, 0 );
+    }
+    reference_clear( ref );
+
+    printf("Max Seed %d\n", (int)max_seed);
+    printf("Done\n");
     for( intptr_t i=0; i < 10; ++i )
     {
         printf( "a[%d] = \"%s\"\n", (int)i, reference_extract_str( htable_get_item(htable, (char*)&i, sizeof(intptr_t), 0 ) ) );
@@ -631,6 +678,8 @@ void main()
 
 
 // ADD REFERNCE COUNTING TO HASHTABLE
+// USE REFFERENCE MANAGEMENT FUNCTION TO MANAGE HASHTABLE DATA AND KEYS
+
 
 
 
