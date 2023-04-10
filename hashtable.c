@@ -15,6 +15,7 @@
 #define SESC_TYPE_OBJ           5
 #define SESC_TYPE_LIST          6
 #define SESC_TYPE_FUNC          7
+//#define SESC_TYPE_CFUNC         8
 
         // case SESC_TYPE_NONE  :
         // case SESC_TYPE_BOOL  :
@@ -73,7 +74,13 @@
 //     intptr_t refcnt
 //     ht_item  table[htable_len]
 // }
-#define htable_len 256
+// CONFIG hash_bits should work from 2-8
+// 2 showed the minimum allocation for my large data sets
+// 8 was the fastest about 3x on my system
+// 3 was only slightly larger with a good bump in speed for "normal" data sets
+// Try profiling on your system with your data sets.
+#define hash_bits 3
+#define htable_len  (1 << hash_bits)
 #define refable_htable_data_idx  refable_data_idx
 #define refable_htable_idx_cnt   (refable_data_idx+(htable_len*ht_item_len))
 #define refable_htable_size      (refable_htable_idx_cnt*SIZEOFINT)
@@ -438,11 +445,11 @@ static unsigned char hash_bytes( const char* data, intptr_t len, char seed )
     // So let's use a 10-bit polynomial with the 8 seed bits being the middle terms
     // Note the terms here are bit 6 represents x^0 and
     // x^9 is assumed to be one by checking it before the shift
-    // poly  15  14  13  12  11  10  09  08  07  06  05  04  03  02  01  00
-    // seed      b7  b6  b5  b4  b3  b2  b1  b0
-    // 1<<6                                      1
-    // term      x^8 x^7 x^6 x^5 x^4 x^3 x^2 x^1 x^0
-    intptr_t poly = (1 << 6) + (seed <<7) ;
+    // poly    15  14  13  12  11  10  09  08  07  06  05  04  03  02  01  00
+    // seed        b7  b6  b5  b4  b3  b2  b1  b0
+    // 513<<6  1                                   1
+    // term    x^9 x^8 x^7 x^6 x^5 x^4 x^3 x^2 x^1 x^0
+    intptr_t poly = (513 << 6) + (seed << 7) ;
 
     intptr_t accum = 0xFF00;
     char i;
@@ -466,7 +473,7 @@ static unsigned char hash_bytes( const char* data, intptr_t len, char seed )
         accum ^= (poly * ((accum >> 15) & 1));
         accum <<= 1;
     }
-    return (accum >> 6) & 0x0FF;
+    return (accum >> 7) & (htable_len-1);
 }
 
 unsigned char reference_hash( const reference_ptr ref, char seed )
@@ -778,7 +785,7 @@ void main()
     printf("Done strings by index.\n");
 
     reference_create_str( ref, "Ted" );
-    for( i=num_strs; i < 0xFFFF; ++i )
+    for( i=num_strs; i < 0xFFFFF; ++i )
     {
         reference_create_int( key_ref, i );
         reference_set_item( htable, key_ref, ref, 0 );
