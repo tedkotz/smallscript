@@ -68,18 +68,15 @@
 #define ht_item_val_head  2
 #define ht_item_val_data  3
 
-// typedef htitem[256] htable
-#define htable_ptr intptr_t*
-#define htable_len 256
-#define htable_size (htable_len * ht_item_size)
 
 // struct refable_list or refable_object {
 //     intptr_t refcnt
-//     htable   table
+//     ht_item  table[htable_len]
 // }
+#define htable_len 256
 #define refable_htable_data_idx  refable_data_idx
-#define refable_htable_idx_cnt   (refable_data_idx+htable_len)
-#define refable_htable_size      (refable_htable_data_idx*SIZEOFINT+htable_size)
+#define refable_htable_idx_cnt   (refable_data_idx+(htable_len*ht_item_len))
+#define refable_htable_size      (refable_htable_idx_cnt*SIZEOFINT)
 
 /* Interfaces ****************************************************************/
 
