@@ -37,12 +37,19 @@
 #define refable_data_idx      1
 #define refable_header_size   (refable_data_idx*SIZEOFINT)
 
-// struct refable_str or refable_bytes
+// struct refable_str or refable_bytes {
+//     intptr_t refcnt
+//     intptr_t len
+//     char     data[]
+// }
 #define refable_bytes_len_idx       refable_data_idx
 #define refable_bytes_data_idx      (refable_data_idx+1)
 #define refable_bytes_header_size   (refable_bytes_data_idx*SIZEOFINT)
 
-// struct reference
+// struct sesc_reference {
+//     intptr_t header
+//     intptr_t dataptr
+// }
 #define reference_ptr       intptr_t*
 #define ref_val_head        0
 #define ref_val_data        1
@@ -50,11 +57,9 @@
 #define reference_size     (reference_len*SIZEOFINT)
 
 // struct ht_item {
-//     intptr_t key_ptr;
-//     intptr_t key_len;
-//     intptr_t value_header;
-//     intptr_t value_data;
-// };
+//     sesc_reference key
+//     sesc_reference value
+// }
 #define ht_item_ptr intptr_t*
 #define ht_item_len 4
 #define ht_item_size (ht_item_len*SIZEOFINT)
@@ -68,7 +73,10 @@
 #define htable_len 256
 #define htable_size (htable_len * ht_item_size)
 
-// struct refable_list or refable_object
+// struct refable_list or refable_object {
+//     intptr_t refcnt
+//     htable   table
+// }
 #define refable_htable_data_idx  refable_data_idx
 #define refable_htable_idx_cnt   (refable_data_idx+htable_len)
 #define refable_htable_size      (refable_htable_data_idx*SIZEOFINT+htable_size)
@@ -76,7 +84,8 @@
 /* Interfaces ****************************************************************/
 
 /* Data **********************************************************************/
-const intptr_t REFERENCE_NONE[reference_len] = { SESC_TYPE_NONE, 0 };
+#define REFERENCE_INIT { SESC_TYPE_NONE, 0 }
+const intptr_t REFERENCE_NONE[] = REFERENCE_INIT;
 
 
 intptr_t max_seed = 0;
@@ -84,24 +93,6 @@ intptr_t max_seed = 0;
 
 /* Functions *****************************************************************/
 
-
-bool reference_countable_type( SESC_TYPE type )
-{
-    switch (type)
-    {
-        case SESC_TYPE_STR   :
-        case SESC_TYPE_BYTES :
-        // case SESC_TYPE_OBJ   :
-        // case SESC_TYPE_LIST  :
-        // case SESC_TYPE_FUNC  :
-            return true;
-
-        // case SESC_TYPE_NONE  :
-        // case SESC_TYPE_BOOL  :
-        // case SESC_TYPE_INT   :
-    }
-    return false;
-}
 
 void refable_header_init( refable_ptr data )
 {
@@ -119,26 +110,26 @@ void reference_clear( reference_ptr ref )
 {
     switch (ref[ref_val_head])
     {
-        // case SESC_TYPE_OBJ   :
-        // {
-        //     refable_ptr tmp = (refable_ptr)ref[ref_val_data];
-        //     --(tmp[refable_refcnt_idx]);
-        //     if(tmp[refable_refcnt_idx] < 1)
-        //     {
-        //         //oject_destroy(tmp);
-        //     }
-        //     break;
-        // }
-        // case SESC_TYPE_LIST  :
-        // {
-        //     refable_ptr tmp = (refable_ptr)ref[ref_val_data];
-        //     --(tmp[refable_refcnt_idx]);
-        //     if(tmp[refable_refcnt_idx] < 1)
-        //     {
-        //         //list_destroy(tmp);
-        //     }
-        //     break;
-        // }
+        case SESC_TYPE_OBJ   :
+        case SESC_TYPE_LIST  :
+        case SESC_TYPE_SUBTABLE:
+        {
+            refable_ptr tmp = (refable_ptr)ref[ref_val_data];
+            --(tmp[refable_refcnt_idx]);
+            if(tmp[refable_refcnt_idx] < 1)
+            {
+                ht_item_ptr item=&tmp[refable_htable_data_idx];
+                intptr_t i=htable_len;
+                while( i-- > 0 )
+                {
+                    reference_clear(&item[ht_item_key_head]);
+                    reference_clear(&item[ht_item_val_head]);
+                    item += ht_item_len;
+                }
+                free(tmp);
+            }
+            break;
+        }
         // case SESC_TYPE_FUNC  :
         // {
         //     refable_ptr tmp = (refable_ptr)ref[ref_val_data];
@@ -175,9 +166,20 @@ void reference_set_refable( reference_ptr dst_ref, SESC_TYPE val_head, refable_p
     if( dst_ref[ref_val_head]!=val_head ||
         dst_ref[ref_val_data]!=(intptr_t)val_data )
     {
-        if(reference_countable_type(val_head))
+        switch (val_head)
         {
-            ++(val_data[refable_refcnt_idx]);
+            case SESC_TYPE_STR   :
+            case SESC_TYPE_BYTES :
+            case SESC_TYPE_OBJ   :
+            case SESC_TYPE_LIST  :
+            case SESC_TYPE_SUBTABLE:
+            // case SESC_TYPE_FUNC  :
+                ++(val_data[refable_refcnt_idx]);
+                break;
+
+            // case SESC_TYPE_NONE  :
+            // case SESC_TYPE_BOOL  :
+            // case SESC_TYPE_INT   :
         }
 
         reference_clear(dst_ref);
@@ -210,7 +212,7 @@ void reference_move( reference_ptr dst_ref, reference_ptr src_ref)
 /** Reference Create Functions ***********************************************/
 void reference_create_byteslike( reference_ptr ref, const char * bytes, intptr_t len, SESC_TYPE val_head)
 {
-    refable_ptr data= malloc(refable_bytes_header_size+len);
+    refable_ptr data = malloc(refable_bytes_header_size+len);
     if( data != NULL )
     {
         refable_header_init( data );
@@ -246,6 +248,21 @@ void reference_create_bool( reference_ptr ref, intptr_t val )
     reference_clear(ref);
     ref[ref_val_head]=SESC_TYPE_BOOL;
     ref[ref_val_data]=(0!=val);
+}
+
+void reference_create_obj( reference_ptr ref )
+{
+    reference_set_refable(ref, SESC_TYPE_OBJ, calloc( refable_htable_size, 1) );
+}
+
+void reference_create_list( reference_ptr ref )
+{
+    reference_set_refable(ref, SESC_TYPE_LIST, calloc( refable_htable_size, 1) );
+}
+
+void reference_create_subtable( reference_ptr ref )
+{
+    reference_set_refable(ref, SESC_TYPE_SUBTABLE, calloc( refable_htable_size, 1) );
 }
 
 /** Reference Extract Functions **********************************************/
@@ -487,15 +504,29 @@ unsigned char reference_hash( const reference_ptr ref, char seed )
     return hash_bytes( (const char*)ref, reference_size, seed );
 }
 
-htable_ptr htable_create(void)
+void reference_set_item( reference_ptr object_ref, const reference_ptr key_ref, const reference_ptr src_ref, char seed)
 {
-    return calloc( htable_len, ht_item_size);
-}
-
-void htable_set_item( htable_ptr table, const reference_ptr key_ref, const reference_ptr src_ref, char seed)
-{
+    refable_ptr data = NULL;
+    switch (object_ref[ref_val_head])
+    {
+        case SESC_TYPE_OBJ   :
+        case SESC_TYPE_LIST  :
+            seed = 0;
+            // intentional fall thru
+        case SESC_TYPE_SUBTABLE:
+            data=(refable_ptr)object_ref[ref_val_data];
+            break;
+        // case SESC_TYPE_NONE  :
+        // case SESC_TYPE_BOOL  :
+        // case SESC_TYPE_INT   :
+        // case SESC_TYPE_STR   :
+        // case SESC_TYPE_BYTES :
+        // case SESC_TYPE_FUNC  :
+        default:
+        return;
+    }
     unsigned hash = reference_hash(key_ref, seed);
-    ht_item_ptr entry = table + (ht_item_len * hash);
+    ht_item_ptr entry = data + (refable_htable_data_idx + ht_item_len * hash);
 
     if (entry[ht_item_val_head] == SESC_TYPE_NONE)
     {
@@ -509,7 +540,7 @@ void htable_set_item( htable_ptr table, const reference_ptr key_ref, const refer
     else if (entry[ht_item_val_head] == SESC_TYPE_SUBTABLE)
     {
         // check subtable
-        return htable_set_item( (htable_ptr)entry[ht_item_val_data], key_ref, src_ref, seed+1);
+        return reference_set_item( &entry[ht_item_val_head], key_ref, src_ref, seed+1);
     }
     else if (0 == reference_cmp(key_ref, &entry[ht_item_key_head]))
     {
@@ -524,18 +555,17 @@ void htable_set_item( htable_ptr table, const reference_ptr key_ref, const refer
             max_seed = seed;
             printf("Max Seed %d\n", (int)max_seed);
         }
+        intptr_t new_table[] = REFERENCE_INIT;
 
-        htable_ptr tmp = htable_create();
+        reference_create_subtable( new_table);
 
-        htable_set_item( tmp, &entry[ht_item_key_head], &entry[ht_item_val_head], seed+1);
+        reference_set_item( new_table, &entry[ht_item_key_head], &entry[ht_item_val_head], seed+1);
+
+        reference_move(&entry[ht_item_val_head], new_table);
 
         reference_clear( &entry[ht_item_key_head] );
-        reference_clear( &entry[ht_item_val_head] );
 
-        entry[ht_item_val_data] = (intptr_t)tmp;
-        entry[ht_item_val_head] = SESC_TYPE_SUBTABLE;
-
-        return htable_set_item( (htable_ptr)entry[ht_item_val_data], key_ref, src_ref, seed+1);
+        return reference_set_item( &entry[ht_item_val_head], key_ref, src_ref, seed+1);
     }
     else
     {
@@ -543,15 +573,35 @@ void htable_set_item( htable_ptr table, const reference_ptr key_ref, const refer
     }
 }
 
-const reference_ptr htable_get_item ( htable_ptr table, const reference_ptr key_ref, char seed)
+
+const reference_ptr reference_get_item( reference_ptr object_ref, const reference_ptr key_ref, char seed)
 {
+    refable_ptr data = NULL;
+    switch (object_ref[ref_val_head])
+    {
+        case SESC_TYPE_OBJ   :
+        case SESC_TYPE_LIST  :
+            seed = 0;
+            // intentional fall thru
+        case SESC_TYPE_SUBTABLE:
+            data=(refable_ptr)object_ref[ref_val_data];
+            break;
+        // case SESC_TYPE_NONE  :
+        // case SESC_TYPE_BOOL  :
+        // case SESC_TYPE_INT   :
+        // case SESC_TYPE_STR   :
+        // case SESC_TYPE_BYTES :
+        // case SESC_TYPE_FUNC  :
+        default:
+        return REFERENCE_NONE;
+    }
     unsigned hash = reference_hash(key_ref, seed);
-    ht_item_ptr entry = table + (ht_item_len * hash);
+    ht_item_ptr entry = data + (refable_htable_data_idx + ht_item_len * hash);
 
     if (entry[ht_item_val_head] == SESC_TYPE_SUBTABLE)
     {
         // Check subtable
-        return htable_get_item( (htable_ptr)entry[ht_item_val_data], key_ref, seed+1);
+        return reference_get_item( &entry[ht_item_val_head], key_ref, seed+1);
     }
     else if (0 == reference_cmp(key_ref, &entry[ht_item_key_head]))
     {
@@ -564,19 +614,19 @@ const reference_ptr htable_get_item ( htable_ptr table, const reference_ptr key_
     }
 }
 
-
-
 // TODO - TKOTZ
-// Add htable_destroy cleanup function
-// Make a hashtable refable so that it can be used for object and/or list.
-// Add reference_create_htable
-// should refernce htable replace SUBTABLE?
-
+// Needs Callable functionality
+// Needs parser
+// Needs way to detect circular references
+//   scan contents of htable for itself?
+//   prevent an htable from containing itselfas key or value?
+// Needs iterators
 
 /*****************************************************************************/
 /** Main     *****************************************************************/
 /*****************************************************************************/
 #ifdef HASHTEST
+#include <malloc.h>
 void main()
 {
     const char * const strs[] = {
@@ -656,14 +706,13 @@ void main()
     char st4[] = "Fing";
     char st5[] = "Fang";
     char st6[] = "Foom";
-
+    intptr_t i=0;
+    struct mallinfo mi;
     const int num_strs = sizeof(strs)/sizeof(strs[0]);
     //reference_ptr refptr;
-    intptr_t ref[reference_len];
-    intptr_t key_ref[reference_len];
-    reference_init(ref);
-    reference_init(key_ref);
-
+    intptr_t ref[] = REFERENCE_INIT;
+    intptr_t key_ref[] = REFERENCE_INIT;
+    intptr_t htable[]  = REFERENCE_INIT;
 
 
     for( int i=0; i < num_strs; ++i )
@@ -680,68 +729,82 @@ void main()
     printf( "%s - %02X\n", st5, (int)hash_bytes( st5, sizeof(st5)-1, 0) & 0x0FF);
     printf( "%s - %02X\n", st6, (int)hash_bytes( st6, sizeof(st6)-1, 0) & 0x0FF);
 
-    htable_ptr htable = htable_create();
+    mi = mallinfo();
+    printf("inuse blocks: %d\n", mi.uordblks);
 
-    for( int i=3; i < num_strs; ++i )
+    reference_create_obj( htable );
+
+    mi = mallinfo();
+    printf("Created htable.\ninuse blocks: %d\n", mi.uordblks);
+
+    for( i=3; i < num_strs; ++i )
     {
         reference_create_str( key_ref, strs[i] );
         reference_create_str( ref, strs[i-3] );
-        htable_set_item( htable, key_ref, ref, 0 );
-        reference_clear( ref );
-        reference_clear( key_ref );
+        reference_set_item( htable, key_ref, ref, 0 );
     }
 
-    for( int i=0; i < num_strs; ++i )
+    for( i=0; i < num_strs; ++i )
     {
         reference_create_str( key_ref, strs[i] );
-        printf( "a.%s = \"%s\"\n", strs[i], reference_extract_str( htable_get_item(htable, key_ref, 0 ) ) );
-        reference_clear( key_ref );
+        printf( "a.%s = \"%s\"\n", strs[i], reference_extract_str( reference_get_item(htable, key_ref, 0 ) ) );
     }
 
-    for( int i=5; i < num_strs; ++i )
+    for( i=5; i < num_strs; ++i )
     {
         reference_create_str( key_ref, strs[i] );
         reference_create_str( ref, strs[i-5] );
-        htable_set_item( htable, key_ref, ref, 0 );
-        reference_clear( ref );
+        reference_set_item( htable, key_ref, ref, 0 );
     }
 
-    for( int i=0; i < num_strs; ++i )
+    for( i=0; i < num_strs; ++i )
     {
         reference_create_str( key_ref, strs[i] );
-        printf( "a.%s = \"%s\"\n", strs[i], reference_extract_str( htable_get_item(htable, key_ref, 0 ) ) );
+        printf( "a.%s = \"%s\"\n", strs[i], reference_extract_str( reference_get_item(htable, key_ref, 0 ) ) );
     }
 
-    for( intptr_t i=0; i < 10; ++i )
+    for( i=0; i < 10; ++i )
     {
         reference_create_int( key_ref, i );
-        printf( "a[%d] = \"%s\"\n", (int)i, reference_extract_str( htable_get_item(htable, key_ref, 0 ) ) );
+        printf( "a[%d] = \"%s\"\n", (int)i, reference_extract_str( reference_get_item(htable, key_ref, 0 ) ) );
     }
 
-    for( intptr_t i=0; i < num_strs; ++i )
+    mi = mallinfo();
+    printf("inuse blocks: %d\n", mi.uordblks);
+
+    for( i=0; i < num_strs; ++i )
     {
-        printf("adding %d\n", (int)i);
         reference_create_int( key_ref, i );
         reference_create_str( ref, strs[i] );
-        htable_set_item( htable, key_ref, ref, 0 );
-        reference_clear( ref );
+        reference_set_item( htable, key_ref, ref, 0 );
     }
+    printf("Done strings by index.\n");
 
     reference_create_str( ref, "Ted" );
-    for( intptr_t i=num_strs; i < 0xFFFF; ++i )
+    for( i=num_strs; i < 0xFFFF; ++i )
     {
         reference_create_int( key_ref, i );
-        htable_set_item( htable, key_ref, ref, 0 );
+        reference_set_item( htable, key_ref, ref, 0 );
     }
-    reference_clear( ref );
 
     printf("Max Seed %d\n", (int)max_seed);
     printf("Done\n");
-    for( intptr_t i=0; i < 10; ++i )
+    mi = mallinfo();
+    printf("inuse blocks: %d\n", mi.uordblks);
+    for( i=0; i < 0xFF; ++i )
     {
         reference_create_int( key_ref, i );
-        printf( "a[%d] = \"%s\"\n", (int)i, reference_extract_str( htable_get_item(htable, key_ref, 0 ) ) );
+        printf( "a[%d] = \"%s\"\n", (int)i, reference_extract_str( reference_get_item(htable, key_ref, 0 ) ) );
     }
+
+    reference_clear( htable );
+    mi = mallinfo();
+    printf("inuse blocks: %d\n", mi.uordblks);
+
+    reference_clear( ref );
+    reference_clear( key_ref );
+    mi = mallinfo();
+    printf("inuse blocks: %d\n", mi.uordblks);
 }
 
 #endif // HASHTEST
