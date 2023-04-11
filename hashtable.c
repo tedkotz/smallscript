@@ -15,7 +15,7 @@
 #define SESC_TYPE_OBJ           5
 #define SESC_TYPE_LIST          6
 #define SESC_TYPE_FUNC          7
-//#define SESC_TYPE_CFUNC         8
+#define SESC_TYPE_CFUNC         8
 
         // case SESC_TYPE_NONE  :
         // case SESC_TYPE_BOOL  :
@@ -25,6 +25,7 @@
         // case SESC_TYPE_OBJ   :
         // case SESC_TYPE_LIST  :
         // case SESC_TYPE_FUNC  :
+        // case SESC_TYPE_CFUNC  :
 
 #define SESC_TYPE_STATIC_STR    0x12
 #define SESC_TYPE_SUBTABLE      0x11
@@ -85,11 +86,39 @@
 #define refable_htable_idx_cnt   (refable_data_idx+(htable_len*ht_item_len))
 #define refable_htable_size      (refable_htable_idx_cnt*SIZEOFINT)
 
+
+// struct sesc_context {
+//     sesc_reference current_scope
+//     ??sesc_reference stack_list
+//     ??intptr_t       stack_ptr
+//  };
+// Calling conventions
+// The calling object is passed as the entries "0"
+// args are pushed as numbered entries left to right starting at 1
+// obj.method(a, b, c) -> [0] = obj, [1]=a, [2]=b, [3]=c
+// return values are stored as negative numbered entries left to right starting at -1
+// key "@parent" is next scope up.
+// key "@root" is top scope or is None if this is the global scope
+#define sesc_context_ptr  reference_ptr
+#define sesc_context_len  reference_len
+#define sesc_context_size reference_size
+
+#define sesc_attr_ptr intptr_t*
+
 /* Interfaces ****************************************************************/
+typedef void (*SESC_CFUNC_TYPE)(reference_ptr ctx);
+
 
 /* Data **********************************************************************/
 #define REFERENCE_INIT { SESC_TYPE_NONE, 0 }
 const intptr_t REFERENCE_NONE[] = REFERENCE_INIT;
+const intptr_t REFERENCE_ZERO[] = { SESC_TYPE_INT, 0 };
+const intptr_t REFERENCE_1[] = { SESC_TYPE_INT, 1 };
+const intptr_t REFERENCE_2[] = { SESC_TYPE_INT, 2 };
+const intptr_t REFERENCE_3[] = { SESC_TYPE_INT, 3 };
+const intptr_t REFERENCE_n1[] = { SESC_TYPE_INT, -1 };
+const intptr_t REFERENCE_n2[] = { SESC_TYPE_INT, -2 };
+const intptr_t REFERENCE_n3[] = { SESC_TYPE_INT, -3 };
 
 
 intptr_t max_seed = 0;
@@ -160,6 +189,7 @@ void reference_clear( reference_ptr ref )
         // case SESC_TYPE_NONE  :
         // case SESC_TYPE_BOOL  :
         // case SESC_TYPE_INT   :
+        // case SESC_TYPE_CFUNC :
     }
     ref[ref_val_head]=SESC_TYPE_NONE;
     ref[ref_val_data]=0;
@@ -184,6 +214,7 @@ void reference_set_refable( reference_ptr dst_ref, SESC_TYPE val_head, refable_p
             // case SESC_TYPE_NONE  :
             // case SESC_TYPE_BOOL  :
             // case SESC_TYPE_INT   :
+            // case SESC_TYPE_CFUNC  :
         }
 
         reference_clear(dst_ref);
@@ -254,6 +285,13 @@ void reference_create_bool( reference_ptr ref, intptr_t val )
     ref[ref_val_data]=(0!=val);
 }
 
+void reference_create_cfunc( reference_ptr ref, SESC_CFUNC_TYPE func )
+{
+    reference_clear(ref);
+    ref[ref_val_head]=SESC_TYPE_CFUNC;
+    ref[ref_val_data]=(intptr_t)func;
+}
+
 void reference_create_obj( reference_ptr ref )
 {
     reference_set_refable(ref, SESC_TYPE_OBJ, calloc( refable_htable_size, 1) );
@@ -283,6 +321,7 @@ const char* reference_extract_bytes( const reference_ptr ref, intptr_t* return_l
         case SESC_TYPE_OBJ   :
         case SESC_TYPE_LIST  :
         case SESC_TYPE_FUNC  :
+        case SESC_TYPE_CFUNC  :
         {
             *return_len = SIZEOFINT;
             return (char*)&ref[ref_val_data];
@@ -347,6 +386,10 @@ const char* reference_extract_str( const reference_ptr ref )
         case SESC_TYPE_FUNC  :
         {
             return "func";
+        }
+        case SESC_TYPE_CFUNC  :
+        {
+            return "extern";
         }
     }
     fputs("reference_extract_str():Unknown Type", stderr);
@@ -415,6 +458,7 @@ intptr_t reference_cmp( const reference_ptr l_ref, const reference_ptr r_ref )
         case SESC_TYPE_OBJ   :
         case SESC_TYPE_LIST  :
         case SESC_TYPE_FUNC  :
+        case SESC_TYPE_CFUNC  :
             return reference_extract_int(r_ref) - reference_extract_int(l_ref);
 
         case SESC_TYPE_STR   :
@@ -436,6 +480,29 @@ intptr_t reference_cmp( const reference_ptr l_ref, const reference_ptr r_ref )
     fputs("reference_cmp():Unknown Type", stderr);
     return -100;
 }
+
+void reference_call( reference_ptr parent_ctx, const reference_ptr callable/*, reference_ptr arg_list */)
+{
+    switch (callable[ref_val_head])
+    {
+        case SESC_TYPE_CFUNC  :
+        {
+            SESC_CFUNC_TYPE func = (SESC_CFUNC_TYPE)callable[ref_val_data];
+            func( parent_ctx );
+        }
+        // case SESC_TYPE_NONE  :
+        // case SESC_TYPE_BOOL  :
+        // case SESC_TYPE_INT   :
+        // case SESC_TYPE_STR   :
+        // case SESC_TYPE_BYTES :
+        // case SESC_TYPE_OBJ   :
+        // case SESC_TYPE_LIST  :
+        // case SESC_TYPE_FUNC  :
+        //    intptr_t ctx[] = REFERENCE_INIT;
+        //    reference_create_object(ctx);
+    }
+}
+
 
 /** Hash Table Functions *****************************************************/
 
@@ -490,6 +557,7 @@ unsigned char reference_hash( const reference_ptr ref, char seed )
         case SESC_TYPE_OBJ   :
         case SESC_TYPE_LIST  :
         case SESC_TYPE_FUNC  :
+        case SESC_TYPE_CFUNC  :
         {
             // hash the reference
             return hash_bytes( (const char*)ref, reference_size, seed);
@@ -526,6 +594,7 @@ void reference_set_item( reference_ptr object_ref, const reference_ptr key_ref, 
         // case SESC_TYPE_STR   :
         // case SESC_TYPE_BYTES :
         // case SESC_TYPE_FUNC  :
+        // case SESC_TYPE_CFUNC  :
         default:
         return;
     }
@@ -578,7 +647,7 @@ void reference_set_item( reference_ptr object_ref, const reference_ptr key_ref, 
 }
 
 
-const reference_ptr reference_get_item( reference_ptr object_ref, const reference_ptr key_ref, char seed)
+const reference_ptr reference_get_item( const reference_ptr object_ref, const reference_ptr key_ref, char seed)
 {
     refable_ptr data = NULL;
     switch (object_ref[ref_val_head])
@@ -596,6 +665,7 @@ const reference_ptr reference_get_item( reference_ptr object_ref, const referenc
         // case SESC_TYPE_STR   :
         // case SESC_TYPE_BYTES :
         // case SESC_TYPE_FUNC  :
+        // case SESC_TYPE_CFUNC  :
         default:
         return REFERENCE_NONE;
     }
@@ -617,6 +687,198 @@ const reference_ptr reference_get_item( reference_ptr object_ref, const referenc
         return REFERENCE_NONE;
     }
 }
+
+/*****************************************************************************/
+/** Context and Calling ******************************************************/
+void cfunc_add(reference_ptr ctx)
+{
+    intptr_t l = reference_extract_int(reference_get_item(ctx, REFERENCE_1, 0));
+    intptr_t r = reference_extract_int(reference_get_item(ctx, REFERENCE_2, 0));
+    intptr_t ref[] = REFERENCE_INIT;
+    reference_create_int( ref, l+r );
+    reference_set_item( ctx, REFERENCE_n1, ref, 0 );
+}
+
+void cfunc_sub(reference_ptr ctx)
+{
+    intptr_t l = reference_extract_int(reference_get_item(ctx, REFERENCE_1, 0));
+    intptr_t r = reference_extract_int(reference_get_item(ctx, REFERENCE_2, 0));
+    intptr_t ref[] = REFERENCE_INIT;
+    reference_create_int( ref, l-r );
+    reference_set_item( ctx, REFERENCE_n1, ref, 0 );
+}
+
+sesc_attr_ptr sesc_attr_create(void)
+{
+    return NULL;
+}
+
+void sesc_attr_destroy(sesc_attr_ptr ctx)
+{
+}
+
+sesc_context_ptr sesc_context_create(sesc_attr_ptr attr)
+{
+    intptr_t ref[] = REFERENCE_INIT;
+    intptr_t key_ref[] = REFERENCE_INIT;
+    sesc_context_ptr ctx = calloc( sesc_context_size, 1);
+    reference_create_obj(ctx);
+
+    reference_create_str( key_ref, "add" );
+    reference_create_cfunc( ref, cfunc_add );
+    reference_set_item( ctx, key_ref, ref, 0 );
+
+    reference_create_str( key_ref, "sub" );
+    reference_create_cfunc( ref, cfunc_sub );
+    reference_set_item( ctx, key_ref, ref, 0 );
+
+    reference_clear( ref );
+    reference_clear( key_ref );
+    return ctx;
+}
+
+bool charinstr( char c, const char * delim )
+{
+    while( *delim != '\0' )
+    {
+        if (*delim++ == c)
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+char * str_ltrim( char * str, const char * delim )
+{
+    while( charinstr(*str, delim) )
+    {
+        ++str;
+    }
+    if (*str == '\0')
+    {
+        return NULL;
+    }
+    return str;
+}
+
+char * str_rest( char * head, const char * delim )
+{
+    while( !charinstr(*head, delim) )
+    {
+        if (*head++ == '\0')
+        {
+            return NULL;
+        }
+    }
+    *head++ = '\0';
+    return head;
+}
+
+const reference_ptr walk_scope_get_item( const reference_ptr ctx, const reference_ptr key_ref)
+{
+    const reference_ptr returnVal = reference_get_item(ctx, key_ref, 0);
+    if( 0 == reference_cmp(returnVal, REFERENCE_NONE) )
+    {
+        const reference_ptr parent_ref = reference_get_item(ctx, REFERENCE_ZERO, 0);
+        if(parent_ref[ref_val_head] == SESC_TYPE_OBJ)
+        {
+            return walk_scope_get_item( parent_ref, key_ref);
+        }
+    }
+    return returnVal;
+}
+
+intptr_t sesc_eval_string(sesc_context_ptr ctx, const char * str)
+{
+    // TODO
+    // simple expression
+    // ([_a-zA-z][_a-zA-z0-9]*)=([_a-zA-z][_a-zA-z0-9]*)\[[0-9]+(,[0-9]+)*\];
+    intptr_t idx = 1;
+    intptr_t key_ref[] = REFERENCE_INIT;
+    intptr_t ref[] = REFERENCE_INIT;
+    const reference_ptr return_ref = REFERENCE_ZERO;
+    const intptr_t len = strlen(str)+1;
+    char tokenspace[len];
+    strncpy(tokenspace, str, len);
+    char* varname = str_ltrim(tokenspace, " ");
+    char* funcname = str_rest( varname, "=" );
+    if( NULL == funcname )
+    {
+        funcname =  varname;
+        varname = NULL;
+    }
+    char* argument = str_rest( funcname, "(" );
+    str_rest( argument, ")" );
+    char* arguments = str_rest( argument, "," );
+    while( NULL != arguments )
+    {
+        reference_create_int( ref, atoi(argument) );
+        reference_create_int( key_ref, idx++ );
+        reference_set_item( ctx, key_ref, ref, 0);
+        argument = arguments;
+        arguments = str_rest( argument, "," );
+    }
+    reference_create_int( ref, atoi(argument) );
+    reference_create_int( key_ref, idx++ );
+    reference_set_item( ctx, key_ref, ref, 0);
+
+    reference_create_str( key_ref, funcname );
+    reference_call( ctx, walk_scope_get_item(ctx, key_ref));
+    if( varname != NULL )
+    {
+        reference_create_str( key_ref, varname );
+        return_ref = reference_get_item(ctx, REFERENCE_n1, 0 );
+        reference_set_item( ctx, key_ref, return_ref , 0);
+    }
+    reference_clear(key_ref);
+    return reference_extract_int(return_ref);
+}
+
+intptr_t sesc_get_int_by_idx(sesc_context_ptr ctx, intptr_t idx)
+{
+    intptr_t key_ref[] = REFERENCE_INIT;
+    reference_create_int( key_ref, idx );
+    return reference_extract_int(reference_get_item(ctx, key_ref, 0));
+    // int references don't have to be cleaned up.
+}
+
+intptr_t sesc_get_int_by_name(sesc_context_ptr ctx, const char* name)
+{
+    intptr_t key_ref[] = REFERENCE_INIT;
+    reference_create_str( key_ref, name );
+    intptr_t returnVal = reference_extract_int(walk_scope_get_item(ctx, key_ref));
+    reference_clear(key_ref);
+    return returnVal;
+}
+
+const char* sesc_get_string_by_idx(sesc_context_ptr ctx, intptr_t idx)
+{
+    intptr_t key_ref[] = REFERENCE_INIT;
+    reference_create_int( key_ref, idx );
+    return reference_extract_str(reference_get_item(ctx, key_ref, 0));
+    // int references don't have to be cleaned up.
+}
+
+const char* sesc_get_string_by_name(sesc_context_ptr ctx, const char* name)
+{
+    intptr_t key_ref[] = REFERENCE_INIT;
+    reference_create_str( key_ref, name );
+    const char* returnVal = reference_extract_str(walk_scope_get_item(ctx, key_ref));
+    reference_clear(key_ref);
+    return returnVal;
+}
+
+void sesc_context_destroy(sesc_context_ptr ctx)
+{
+    reference_clear(ctx);
+    free(ctx);
+}
+
+
+
+
+
 
 // TODO - TKOTZ
 // Needs Callable functionality

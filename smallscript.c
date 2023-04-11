@@ -2,7 +2,7 @@
 #include "smallscript.h"
 
 
-typedef enum sscript_Types
+typedef enum SESC_TYPE
 {
 //a string
 //a number
@@ -36,9 +36,9 @@ typedef enum sscript_Types
     //??Type thread
     //??Date // numeric type??
 
-} sscript_Types;
+} SESC_TYPE;
 
-typedef int* sscript_Object;
+typedef int* sesc_Object;
 
 #define REFERENCE_HEADER 0
 #define REFERENCE_DATA 1
@@ -62,47 +62,47 @@ typedef struct reference
     intptr_t data;
 } reference;
 
-struct sscript_attr
+struct sesc_attr
 {
     int version;
 };
 
-struct sscript_context
+struct sesc_context
 {
     int* stack;
-    sscript_Object scope;
+    sesc_Object scope;
 };
 
-sscript_attr* sscript_attr_create(void)
+sesc_attr* sesc_attr_create(void)
 {
     return NULL;
 }
 
-sscript_context* sscript_context_create(sscript_attr* attr)
+sesc_context* sesc_context_create(sesc_attr* attr)
 {
     return NULL;
 }
 
-int sscript_eval_string(sscript_context* ctx, const char * str)
+int sesc_eval_string(sesc_context* ctx, const char * str)
 {
     return 0;
 }
 
-int sscript_get_int(sscript_context* ctx, int id)
+int sesc_get_int(sesc_context* ctx, int id)
 {
     return 0;
 }
 
-const char* sscript_get_string(sscript_context* ctx, int id)
+const char* sesc_get_string(sesc_context* ctx, int id)
 {
     return "";
 }
 
-void sscript_context_destroy(sscript_context* ctx)
+void sesc_context_destroy(sesc_context* ctx)
 {
 }
 
-void sscript_attr_destroy(sscript_attr* ctx)
+void sesc_attr_destroy(sesc_attr* ctx)
 {
 }
 

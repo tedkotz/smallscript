@@ -1,17 +1,17 @@
 #ifndef SMALLSCRIPT_H
 #define SMALLSCRIPT_H
 
-typedef struct sscript_attr sscript_attr;
+typedef struct sesc_attr sesc_attr;
 
-typedef struct sscript_context sscript_context;
+typedef struct sesc_context sesc_context;
 
-extern sscript_attr* sscript_attr_create(void);
-extern sscript_context* sscript_context_create(sscript_attr* attr);
-extern int sscript_eval_string(sscript_context* ctx, const char * str);
-extern int sscript_get_int(sscript_context* ctx, int id);
-extern const char* sscript_get_string(sscript_context* ctx, int id);
-extern void sscript_context_destroy(sscript_context* ctx);
-extern void sscript_attr_destroy(sscript_attr* ctx);
+extern sesc_attr* sesc_attr_create(void);
+extern sesc_context* sesc_context_create(sesc_attr* attr);
+extern intptr_t sesc_eval_string(sesc_context* ctx, const char * str);
+extern intptr_t sesc_get_int_by_idx(sesc_context* ctx, intptr_t id);
+extern intptr_t sesc_get_int_by_name(sesc_context* ctx, const char* name);
+extern void sesc_context_destroy(sesc_context* ctx);
+extern void sesc_attr_destroy(sesc_attr* ctx);
 
 
 // [ "ant", "is", "uncle"][1:3][0]
