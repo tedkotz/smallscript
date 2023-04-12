@@ -341,6 +341,8 @@ const char* reference_extract_bytes( const reference_ptr ref, intptr_t* return_l
     return (char*)ref;
 }
 
+
+// TKOTZ switch extract String to snprintf semantics
 const char* reference_extract_str( const reference_ptr ref )
 {
     switch (ref[ref_val_head])
@@ -364,7 +366,11 @@ const char* reference_extract_str( const reference_ptr ref )
 
         case SESC_TYPE_INT   :
         {
-            return "int";
+            // TKOTZ - This is bad
+            static char returnVal[SIZEOFINT*3+1];
+            snprintf( returnVal, sizeof(returnVal), "%"PRIdPTR, ref[ref_val_data] );
+            return returnVal;
+            //return "int";
         }
         case SESC_TYPE_STR   :
         {
@@ -689,54 +695,7 @@ const reference_ptr reference_get_item( const reference_ptr object_ref, const re
 }
 
 /*****************************************************************************/
-/** Context and Calling ******************************************************/
-void cfunc_add(reference_ptr ctx)
-{
-    intptr_t l = reference_extract_int(reference_get_item(ctx, REFERENCE_1, 0));
-    intptr_t r = reference_extract_int(reference_get_item(ctx, REFERENCE_2, 0));
-    intptr_t ref[] = REFERENCE_INIT;
-    reference_create_int( ref, l+r );
-    reference_set_item( ctx, REFERENCE_n1, ref, 0 );
-}
-
-void cfunc_sub(reference_ptr ctx)
-{
-    intptr_t l = reference_extract_int(reference_get_item(ctx, REFERENCE_1, 0));
-    intptr_t r = reference_extract_int(reference_get_item(ctx, REFERENCE_2, 0));
-    intptr_t ref[] = REFERENCE_INIT;
-    reference_create_int( ref, l-r );
-    reference_set_item( ctx, REFERENCE_n1, ref, 0 );
-}
-
-sesc_attr_ptr sesc_attr_create(void)
-{
-    return NULL;
-}
-
-void sesc_attr_destroy(sesc_attr_ptr ctx)
-{
-}
-
-sesc_context_ptr sesc_context_create(sesc_attr_ptr attr)
-{
-    intptr_t ref[] = REFERENCE_INIT;
-    intptr_t key_ref[] = REFERENCE_INIT;
-    sesc_context_ptr ctx = calloc( sesc_context_size, 1);
-    reference_create_obj(ctx);
-
-    reference_create_str( key_ref, "add" );
-    reference_create_cfunc( ref, cfunc_add );
-    reference_set_item( ctx, key_ref, ref, 0 );
-
-    reference_create_str( key_ref, "sub" );
-    reference_create_cfunc( ref, cfunc_sub );
-    reference_set_item( ctx, key_ref, ref, 0 );
-
-    reference_clear( ref );
-    reference_clear( key_ref );
-    return ctx;
-}
-
+/** String manipulation ******************************************************/
 bool charinstr( char c, const char * delim )
 {
     while( *delim != '\0' )
@@ -775,6 +734,96 @@ char * str_rest( char * head, const char * delim )
     return head;
 }
 
+/** Context and Calling ******************************************************/
+void cfunc_add(reference_ptr ctx)
+{
+    intptr_t l = reference_extract_int(reference_get_item(ctx, REFERENCE_1, 0));
+    intptr_t r = reference_extract_int(reference_get_item(ctx, REFERENCE_2, 0));
+    intptr_t ref[] = REFERENCE_INIT;
+    reference_create_int( ref, l+r );
+    reference_set_item( ctx, REFERENCE_n1, ref, 0 );
+}
+
+void cfunc_sub(reference_ptr ctx)
+{
+    intptr_t l = reference_extract_int(reference_get_item(ctx, REFERENCE_1, 0));
+    intptr_t r = reference_extract_int(reference_get_item(ctx, REFERENCE_2, 0));
+    intptr_t ref[] = REFERENCE_INIT;
+    reference_create_int( ref, l-r );
+    reference_set_item( ctx, REFERENCE_n1, ref, 0 );
+}
+
+void cfunc_print(reference_ptr ctx)
+{
+    const char * str = reference_extract_str(reference_get_item(ctx, REFERENCE_1, 0));
+    intptr_t concat = reference_extract_int(reference_get_item(ctx, REFERENCE_2, 0));
+    fputs( str, stdout );
+    if( !concat )
+    {
+        fputs( "\n", stdout );
+    }
+}
+
+void cfunc_input(reference_ptr ctx)
+{
+    intptr_t ref[] = REFERENCE_INIT;
+    char buff[256];
+    fgets( buff, 256, stdin );
+    str_rest( buff, "\n\r");
+    reference_create_str( ref, buff);
+    reference_set_item( ctx, REFERENCE_n1, ref, 0 );
+}
+
+void cfunc_inputint(reference_ptr ctx)
+{
+    intptr_t ref[] = REFERENCE_INIT;
+    char buff[256];
+    fgets( buff, 256, stdin );
+    reference_create_int( ref, atoi(buff));
+    reference_set_item( ctx, REFERENCE_n1, ref, 0 );
+}
+
+sesc_attr_ptr sesc_attr_create(void)
+{
+    return NULL;
+}
+
+void sesc_attr_destroy(sesc_attr_ptr ctx)
+{
+}
+
+sesc_context_ptr sesc_context_create(sesc_attr_ptr attr)
+{
+    intptr_t ref[] = REFERENCE_INIT;
+    intptr_t key_ref[] = REFERENCE_INIT;
+    sesc_context_ptr ctx = calloc( sesc_context_size, 1);
+    reference_create_obj(ctx);
+
+    reference_create_str( key_ref, "add" );
+    reference_create_cfunc( ref, cfunc_add );
+    reference_set_item( ctx, key_ref, ref, 0 );
+
+    reference_create_str( key_ref, "sub" );
+    reference_create_cfunc( ref, cfunc_sub );
+    reference_set_item( ctx, key_ref, ref, 0 );
+
+    reference_create_str( key_ref, "print" );
+    reference_create_cfunc( ref, cfunc_print );
+    reference_set_item( ctx, key_ref, ref, 0 );
+
+    reference_create_str( key_ref, "input" );
+    reference_create_cfunc( ref, cfunc_input );
+    reference_set_item( ctx, key_ref, ref, 0 );
+
+    reference_create_str( key_ref, "inputint" );
+    reference_create_cfunc( ref, cfunc_inputint );
+    reference_set_item( ctx, key_ref, ref, 0 );
+
+    reference_clear( ref );
+    reference_clear( key_ref );
+    return ctx;
+}
+
 const reference_ptr walk_scope_get_item( const reference_ptr ctx, const reference_ptr key_ref)
 {
     const reference_ptr returnVal = reference_get_item(ctx, key_ref, 0);
@@ -787,6 +836,50 @@ const reference_ptr walk_scope_get_item( const reference_ptr ctx, const referenc
         }
     }
     return returnVal;
+}
+
+void sesc_eval_argument( reference_ptr ref, sesc_context_ptr ctx, char * str)
+{
+    intptr_t key_ref[] = REFERENCE_INIT;
+    // Supports string["'], int[-+0-9], variable[_a-zA-Z]
+    switch ( str[0] )
+    {
+        case '+':
+        case '-':
+        case '0':
+        case '1':
+        case '2':
+        case '3':
+        case '4':
+        case '5':
+        case '6':
+        case '7':
+        case '8':
+        case '9':
+            return reference_create_int( ref, atoi(str) );
+
+
+        case '\"':
+            ++str;
+            str_rest( str, "\"" );
+            return reference_create_str( ref, str );
+
+        case '\'':
+            ++str;
+            str_rest( str, "\'" );
+            return reference_create_str( ref, str );
+
+        default:
+            if( (str[0] == '_') ||
+                (str[0] >= 'a' && str[0] <= 'z') ||
+                (str[0] >= 'A' && str[0] <= 'Z')
+            )
+            {
+                reference_create_str( key_ref, str );
+                return reference_copy( ref, walk_scope_get_item(ctx, key_ref));
+            }
+    }
+    return reference_clear(ref);
 }
 
 intptr_t sesc_eval_string(sesc_context_ptr ctx, const char * str)
@@ -813,7 +906,7 @@ intptr_t sesc_eval_string(sesc_context_ptr ctx, const char * str)
     char* arguments = str_rest( argument, "," );
     while( NULL != arguments )
     {
-        reference_create_int( ref, atoi(argument) );
+        sesc_eval_argument( ref, ctx, argument);
         reference_create_int( key_ref, idx++ );
         reference_set_item( ctx, key_ref, ref, 0);
         argument = arguments;

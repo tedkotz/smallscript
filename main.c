@@ -13,11 +13,23 @@ int main( int argc, intptr_t* argv )
     attr = sesc_attr_create();
     ctx = sesc_context_create(attr);
     sesc_eval_string(ctx, "b=add(1,2);");
-    printf("1+2=%d\n", sesc_get_int_by_idx(ctx, -1));
+    //printf("1+2=%d\n", sesc_get_int_by_idx(ctx, -1));
+    sesc_eval_string(ctx, "print('1+2:',1);");
+    sesc_eval_string(ctx, "print(b,0);");
     sesc_eval_string(ctx, "a=sub(2,5);");
-    printf("2-5=%d\n", sesc_get_int_by_name(ctx, "a"));
-    printf("b=%d\n", sesc_get_int_by_name(ctx, "b"));
+    //printf("2-5=%d\n", sesc_get_int_by_name(ctx, "a"));
+    sesc_eval_string(ctx, "print('2-5:',1);");
+    sesc_eval_string(ctx, "print(a,0);");
+    //printf("b=%d\n", sesc_get_int_by_name(ctx, "b"));
+    sesc_eval_string(ctx, "print('b:',1);");
+    sesc_eval_string(ctx, "print(b,0);");
+    sesc_eval_string(ctx, "print(132,0);");
     printf("add=%d\n", sesc_get_int_by_name(ctx, "add"));
+    sesc_eval_string(ctx, "print('What is your name?',0);");
+    sesc_eval_string(ctx, "name=input();");
+    sesc_eval_string(ctx, "print('Hello ',1);");
+    sesc_eval_string(ctx, "print(name,1);");
+    sesc_eval_string(ctx, "print('!!!',0);");
 
     //REPL
     //char line[128];
