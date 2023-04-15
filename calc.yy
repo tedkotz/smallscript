@@ -1,9 +1,12 @@
 %{
 #include<stdio.h>
-#include"calc.h"
+#include"sesc_lex.h"
 #include"hashtable.h"
 #include"smallscript.h"
-#include "calc.tab.h"
+
+
+void yyerror(char * s);
+int yywrap(void);
 
 sesc_context *ctx = NULL;
 intptr_t sizeofbuffer = 2;

@@ -4,7 +4,6 @@
 
 #include <stdio.h>
 #include "hashtable.h"
-#include "calc.h"
 #ifdef CALC
 #include "calc.tab.h"
 #else
