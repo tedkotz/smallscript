@@ -31,6 +31,7 @@
 #define SESC_TYPE_SUBTABLE      0x11
 #define SESC_TYPE intptr_t
 
+#define NOT_A_VLA_SIZE 64
 
 /* Types *********************************************************************/
 // struct refable
@@ -807,18 +808,28 @@ void cfunc_sub(reference_ptr ctx)
 
 void cfunc_print(reference_ptr ctx)
 {
+    char buff[NOT_A_VLA_SIZE];
+    char * str=buff;
     const reference_ptr str_ref = reference_get_item(ctx, REFERENCE_1, 0 );
     intptr_t concat = reference_extract_int(reference_get_item(ctx, REFERENCE_2, 0));
+    intptr_t size = reference_extract_str(str, NOT_A_VLA_SIZE, str_ref );
     // plus 2 : 1 for the null and one optionally for the newline
-    const intptr_t str_size = reference_extract_str(NULL, 0, str_ref )+2;
-    char str[str_size];
-    intptr_t size = reference_extract_str(str, str_size, str_ref );
+    intptr_t str_size = size + 2 ;
+    if( str_size > NOT_A_VLA_SIZE )
+    {
+        str = malloc(str_size);
+        size = reference_extract_str(str, str_size, str_ref );
+    }
     if( !concat )
     {
         str[size++]='\n';
         str[size++]='\0';
     }
     fputs( str, stdout );
+    if( str != buff )
+    {
+        free(str);
+    }
 }
 
 void cfunc_input(reference_ptr ctx)
@@ -944,13 +955,18 @@ intptr_t sesc_eval_string(sesc_context_ptr ctx, const char * str)
     // TODO
     // simple expression
     // ([_a-zA-z][_a-zA-z0-9]*)=([_a-zA-z][_a-zA-z0-9]*)\[[0-9]+(,[0-9]+)*\];
+    char buff[NOT_A_VLA_SIZE];
+    char * tokenspace=buff;
     intptr_t idx = 1;
     intptr_t key_ref[] = REFERENCE_INIT;
     intptr_t ref[] = REFERENCE_INIT;
     const reference_ptr return_ref = REFERENCE_ZERO;
-    const intptr_t len = strlen(str)+1;
-    char tokenspace[len];
-    str_sncpy(tokenspace, len, str, -1);
+    intptr_t len = str_sncpy(tokenspace, NOT_A_VLA_SIZE, str, -1)+1;
+    if( len > NOT_A_VLA_SIZE )
+    {
+        tokenspace = malloc(len);
+        len = str_sncpy(tokenspace, len, str, -1)+1;
+    }
     char* varname = str_ltrim(tokenspace, " ");
     char* funcname = str_tail( varname, "=" );
     if( NULL == funcname )
@@ -982,6 +998,10 @@ intptr_t sesc_eval_string(sesc_context_ptr ctx, const char * str)
         reference_set_item( ctx, key_ref, return_ref , 0);
     }
     reference_clear(key_ref);
+    if( tokenspace!=buff )
+    {
+        free(tokenspace);
+    }
     return reference_extract_int(return_ref);
 }
 
