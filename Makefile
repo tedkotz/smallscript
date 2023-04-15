@@ -4,6 +4,12 @@ CFLAGS = -Wall -Wno-unused-function -Wno-main -Wvla
 
 all: calc smallscript hashtest
 
+synparse: syntax.tab.c sesc_lex.c sesc_lex.h smallscript.h hashtable.c Makefile
+	gcc $(CFLAGS) -o synparse syntax.tab.c sesc_lex.c hashtable.c
+
+syntax.tab.c syntax.tab.h: syntax.yy Makefile
+	yacc -d -b syntax -Wno-yacc -Wcounterexamples syntax.yy
+
 calc: calc.tab.c sesc_lex.c sesc_lex.h smallscript.h hashtable.c Makefile
 	gcc $(CFLAGS) -o calc -DCALC calc.tab.c sesc_lex.c hashtable.c
 

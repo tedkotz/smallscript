@@ -19,7 +19,7 @@ char * buffer = NULL;
 %union { intptr_t ref[2]; }
 
 
-%token SYMBOL NUMBER STRING BOOL NONE BYTES FOR WHILE IN IF ELSE ELIF AND OR NOT XOR EXIT PRINT PRINTLN
+%token SYMBOL NUMBER STRING BOOL NONE BYTES FOR WHILE IN IF ELSE ELIF AND OR NOT XOR EXIT PRINT PRINTLN LE EQ NE GE
 
 %right '='
 %left '|'
@@ -35,14 +35,14 @@ char * buffer = NULL;
 
 list:                       /*empty */
          |
-        list stat ';'
+        list stat '\n'
          |
         list EXIT
          {
            return 0;
          }
          |
-        list error ';'
+        list error '\n'
          {
            yyerrok;
          }
@@ -50,36 +50,17 @@ list:                       /*empty */
 
 stat:    expr
          {
-            // free the expression.
-            reference_clear($1);
-         }
-         |
-         PRINT '[' expr ']'
-         {
-            intptr_t size = reference_extract_str(buffer, sizeofbuffer, $3 );
+            intptr_t size = reference_extract_str(buffer, sizeofbuffer, $1 );
             if ( (size + 2) > sizeofbuffer )
             {
                 sizeofbuffer = size * 2;
                 buffer = realloc ( buffer, sizeofbuffer);
-                size = reference_extract_str(buffer, sizeofbuffer, $3 );
-            }
-            fputs( buffer, stdout );
-            reference_clear($3);
-         }
-         |
-         PRINTLN '[' expr ']'
-         {
-            intptr_t size = reference_extract_str(buffer, sizeofbuffer, $3 );
-            if ( (size + 2) > sizeofbuffer )
-            {
-                sizeofbuffer = size * 2;
-                buffer = realloc ( buffer, sizeofbuffer);
-                size = reference_extract_str(buffer, sizeofbuffer, $3 );
+                size = reference_extract_str(buffer, sizeofbuffer, $1 );
             }
             buffer[size++]='\n';
             buffer[size++]='\0';
             fputs( buffer, stdout );
-            reference_clear($3);
+            reference_clear($1);
          }
          ;
 

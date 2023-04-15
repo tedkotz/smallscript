@@ -1,30 +1,39 @@
 %{
 #include<stdio.h>
-#include"syntax.h"
-#include "y.tab.h"
+#include"sesc_lex.h"
+#include"hashtable.h"
+#include"smallscript.h"
 
-int regs[26];
-int base;
+
+void yyerror(char * s);
+int yywrap(void);
+
+sesc_context *ctx = NULL;
+intptr_t sizeofbuffer = 2;
+char * buffer = NULL;
 
 %}
 
 %start body
 
-%union { intptr_t a[reference_len]; }
+%union { intptr_t ref[reference_len]; }
 
 
-%token NUMBER SYMBOL STRING FOR IN WHILE IF ELIF ELSE
+%token SYMBOL NUMBER STRING BOOL NONE BYTES FOR WHILE IN IF ELSE ELIF AND OR NOT XOR EXIT PRINT PRINTLN LE EQ NE GE
 
+%right '='
 %left '|'
 %left '&'
 %left '+' '-'
 %left '*' '/' '%'
-%left '.'
-%left 'OR'
-%left 'AND'
+%left OR
+%left AND
 %left UNARY  /*supplies precedence for unary minus */
+%left '.'
 
-%type <a> NUMBER SYMBOL STRING stat expr list object function bool none
+%type <ref> NUMBER SYMBOL STRING BYTES BOOL NONE expr
+
+//list object function bool none
 
 
 %%                   /* beginning of rules section */
@@ -41,164 +50,230 @@ body:                       /*empty */
 
 stat:    expr
          {
-           printf("%d\n",$1);
+            // free the expression.
+            reference_clear($1);
          }
          |
-         FOR SYMBOL IN list '{' body '}'
+         PRINT '[' expr ']'
+         {
+            intptr_t size = reference_extract_str(buffer, sizeofbuffer, $3 );
+            if ( (size + 2) > sizeofbuffer )
+            {
+                sizeofbuffer = size * 2;
+                buffer = realloc ( buffer, sizeofbuffer);
+                size = reference_extract_str(buffer, sizeofbuffer, $3 );
+            }
+            fputs( buffer, stdout );
+            reference_clear($3);
+         }
          |
-         WHILE expr '{' body '}'
+         PRINTLN '[' expr ']'
+         {
+            intptr_t size = reference_extract_str(buffer, sizeofbuffer, $3 );
+            if ( (size + 2) > sizeofbuffer )
+            {
+                sizeofbuffer = size * 2;
+                buffer = realloc ( buffer, sizeofbuffer);
+                size = reference_extract_str(buffer, sizeofbuffer, $3 );
+            }
+            buffer[size++]='\n';
+            buffer[size++]='\0';
+            fputs( buffer, stdout );
+            reference_clear($3);
+         }
          |
-         IF bool '{' body '}' ellist ELSE '{' body '}'
-         |
-         IF bool '{' body '}' ELSE '{' body '}'
-         |
-         IF bool '{' body '}' ellist
-         |
-         IF bool '{' body '}'
+         EXIT
+         {
+             return 0;
+         }
          ;
+//         |
+//         FOR SYMBOL IN list '{' body '}'
+//         |
+//         WHILE expr '{' body '}'
+//         |
+//         IF bool '{' body '}' ellist ELSE '{' body '}'
+//         |
+//         IF bool '{' body '}' ELSE '{' body '}'
+//         |
+//         IF bool '{' body '}' ellist
+//         |
+//         IF bool '{' body '}'
 
-ellist:  ellist ELIF bool '{' body '}'
-         |
-         ELIF bool '{' body '}'
-         ;
-
-lvalue:  SYMBOL
-         |
-         lvalue '.' SYMBOL
-         |
-         expr list
-         ;
-
-bool:    lvalue
-         |
-         bool OR bool
-         |
-         bool AND bool
-         |
-         expr '<' expr
-         |
-         expr '<=' expr
-         |
-         expr '==' expr
-         |
-         expr '!=' expr
-         |
-         expr '>' expr
-         |
-         expr '>=' expr
-         |
-         TRUE
-         |
-         FALSE
-         ;
-
-list:    '[' listbody ']'
-         |
-         "[]"
-         |
-         '[' expr ':' expr ':' expr ']'
-         |
-         '[' expr ':' expr ']'
-         |
-         '[' expr ']'
-         |
-         lvalue
-         ;
-
-listbody: listbody ',' expr
-         ;
-
+// ellist:  ellist ELIF bool '{' body '}'
+//          |
+//          ELIF bool '{' body '}'
+//          ;
+//
+// lvalue:  SYMBOL
+//          |
+//          lvalue '.' SYMBOL
+//          |
+//          expr list
+//          ;
+//
+// bool:    lvalue
+//          |
+//          bool OR bool
+//          |
+//          bool AND bool
+//          |
+//          expr '<' expr
+//          |
+//          expr LE expr
+//          |
+//          expr EQ expr
+//          |
+//          expr NE expr
+//          |
+//          expr '>' expr
+//          |
+//          expr GE expr
+//          |
+//          TRUE
+//          |
+//          FALSE
+//          ;
+//
+// list:    '[' listbody ']'
+//          |
+//          '['']'
+//          |
+//          '[' expr ':' expr ':' expr ']'
+//          |
+//          '[' expr ':' expr ']'
+//          |
+//          '[' expr ']'
+//          |
+//          lvalue
+//          ;
+//
+// listbody: listbody ',' expr
+//          ;
 
 expr:    '(' expr ')'
          {
-           $$ = $2;
+           reference_init($$);
+           reference_move( $$, $2);
          }
          |
-         lvalue '=' expr
+         SYMBOL '=' expr
          {
-           regs[$1] = $3;
+           reference_init($$);
+           reference_set_item(ctx, $1, $3, 0 );
+           reference_clear($1);
+           reference_move( $$, $3);
          }
          |
          expr '*' expr
          {
-
-           $$ = $1 * $3;
+           reference_init($$);
+           reference_create_int( $$, reference_extract_int($1)*reference_extract_int($3));
+           reference_clear($1);
+           reference_clear($3);
          }
          |
          expr '/' expr
          {
-           $$ = $1 / $3;
+           reference_init($$);
+           reference_create_int( $$, reference_extract_int($1)/reference_extract_int($3));
+           reference_clear($1);
+           reference_clear($3);
          }
          |
          expr '%' expr
          {
-           $$ = $1 % $3;
+           reference_init($$);
+           reference_create_int( $$, reference_extract_int($1)%reference_extract_int($3));
+           reference_clear($1);
+           reference_clear($3);
          }
          |
          expr '+' expr
          {
-           $$ = $1 + $3;
+           reference_init($$);
+           reference_create_int( $$, reference_extract_int($1)+reference_extract_int($3));
+           reference_clear($1);
+           reference_clear($3);
          }
          |
          expr '-' expr
          {
-           $$ = $1 - $3;
+           reference_init($$);
+           reference_create_int( $$, reference_extract_int($1)-reference_extract_int($3));
+           reference_clear($1);
+           reference_clear($3);
          }
          |
          expr '&' expr
          {
-           $$ = $1 & $3;
+           reference_init($$);
+           reference_create_int( $$, reference_extract_int($1)&reference_extract_int($3));
+           reference_clear($1);
+           reference_clear($3);
          }
          |
          expr '|' expr
          {
-           $$ = $1 | $3;
+             reference_init($$);
+             reference_create_int( $$, reference_extract_int($1)|reference_extract_int($3));
+             reference_clear($1);
+             reference_clear($3);
          }
          |
 
         '-' expr %prec UNARY
          {
-           $$ = -$2;
+             reference_init($$);
+             reference_create_int( $$, -reference_extract_int($2));
+             reference_clear($2);
          }
          |
         '+' expr %prec UNARY
          {
-           $$ = $2;
-         }
-         |
-        '!' expr %prec UNARY
-         {
-           $$ = -$2;
+             reference_init($$);
+             reference_move($$, $2);
          }
          |
         '~' expr %prec UNARY
          {
-           $$ = -$2;
+             reference_init($$);
+             reference_create_int( $$, ~reference_extract_int($2));
+             reference_clear($2);
          }
-         |
-         lvalue
-         {
-           $$ = regs[$1];
-         }
-         |
-         NUMBER
-         ;
 
-number:  DIGIT
+         |
+         SYMBOL
          {
-           $$ = $1;
-           base = ($1==0) ? 8 : 10;
-         }       |
-         number DIGIT
-         {
-           $$ = base * $1 + $2;
+             //lvalue
+             reference_init($$);
+             reference_copy($$ , reference_get_item(ctx, $1, 0 ));
+             reference_clear( $1 );
          }
+
+         | NUMBER
+         | BOOL
+         | NONE
+         | BYTES
+         | STRING
          ;
 
 %%
 int main(int argc, char** argv)
 {
- return(yyparse());
+    sesc_attr *attr=NULL;
+
+    buffer = malloc( sizeofbuffer );
+
+    attr = sesc_attr_create();
+    ctx = sesc_context_create(attr);
+    sesc_attr_destroy(attr);
+
+    yyparse();
+
+    sesc_context_destroy(ctx);
+
+    return 0;
 }
 
 void yyerror(char * s)

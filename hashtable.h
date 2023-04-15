@@ -5,6 +5,7 @@
 
 #define SESC_TYPE_NONE          0
 #define reference_ptr  intptr_t* restrict
+#define reference_len       2
 #define REFERENCE_INIT { SESC_TYPE_NONE, 0 }
 // intptr_t ref[] = REFERENCE_INIT;
 

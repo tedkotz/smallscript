@@ -55,7 +55,6 @@
 // }
 #define ref_val_head        0
 #define ref_val_data        1
-#define reference_len       2
 #define reference_size     (reference_len*SIZEOFINT)
 
 // struct ht_item {

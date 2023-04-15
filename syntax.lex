@@ -30,6 +30,12 @@ char hexdigit( char c )
 
 %}
 %%
+\n {
+    #ifdef CALC
+    return (yytext[0]);
+    #endif
+    }
+
 [\0- ] ; // ignore whitespace
 
 \"(\\.|[^"\\])*\" { // String literal
@@ -68,6 +74,10 @@ not        return(NOT);
 exit       return(EXIT);
 print      return(PRINT);
 println    return(PRINTLN);
+\<\=       return(LE);
+\=\=       return(EQ);
+\!\=       return(NE);
+\>\=       return(GE);
 
 False {
     reference_init( yylval.ref );
