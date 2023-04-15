@@ -1,9 +1,11 @@
 #ifndef SMALLSCRIPT_H
 #define SMALLSCRIPT_H
 
-typedef struct sesc_attr sesc_attr;
+//typedef struct sesc_attr sesc_attr;
+//typedef struct sesc_context sesc_context;
+typedef intptr_t sesc_attr;
 
-typedef struct sesc_context sesc_context;
+typedef intptr_t sesc_context;
 
 extern sesc_attr* sesc_attr_create(void);
 extern sesc_context* sesc_context_create(sesc_attr* attr);

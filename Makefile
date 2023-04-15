@@ -1,7 +1,7 @@
 
 
-calc: y.tab.c lex.yy.c calc.h
-	gcc -Wall -Wno-unused-function -o calc y.tab.c lex.yy.c
+calc: y.tab.c lex.yy.c calc.h smallscript.h hashtable.c
+	gcc -Wall -Wno-unused-function -o calc y.tab.c lex.yy.c hashtable.c
 
 y.tab.c y.tab.h: calc.yy
 	yacc -d -Wno-yacc calc.yy

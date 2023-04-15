@@ -3,7 +3,8 @@
 #include <stdio.h>
 #include "y.tab.h"
 #include "calc.h"
-int c;
+#include "hashtable.h"
+
 %}
 %%
 [\0- ]       ; // ignore whitespace
@@ -11,28 +12,27 @@ int c;
 exit      {
             return(EXIT);
           }
-[a-z][a-zA-Z0-9]* {
-            c = yytext[0];
-            yylval.b = c - 'a';
-            return(LETTER);
+
+[a-zA-Z_][a-zA-Z0-9_]* {
+            // Symbol name
+            reference_init( yylval.ref );
+            reference_create_str( yylval.ref, yytext );
+            return(SYMBOL);
           }
-_[a-z]    {
-            c = yytext[1];
-            yylval.b = c - 'a';
-            return(LETTER);
+
+0x[0-9a-zA-Z][0-9a-zA-Z]*  {
+            reference_init( yylval.ref );
+            reference_create_int( yylval.ref, strtoll( yytext, NULL, 0) );
+            return(NUMBER);
           }
-[A-Z]+     {
-            c = yytext[0];
-            yylval.b = c - 'A';
-            return(LETTER);
+
+[0-9]+   {
+            reference_init( yylval.ref );
+            reference_create_int( yylval.ref, strtoll( yytext, NULL, 0) );
+            return(NUMBER);
           }
-[0-9]     {
-            c = yytext[0];
-            yylval.b = c - '0';
-            return(DIGIT);
-          }
+
 [^a-zA-Z0-9\b]    {
-                 c = yytext[0];
-                 return(c);
+                 return(yytext[0]);
               }
 %%

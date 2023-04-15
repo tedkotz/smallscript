@@ -7,7 +7,7 @@
 #define NONE_HASH 0
 
 // enum SESC_TYPE
-#define SESC_TYPE_NONE          0
+//#define SESC_TYPE_NONE          0
 #define SESC_TYPE_BOOL          1
 #define SESC_TYPE_INT           2
 #define SESC_TYPE_STR           3
