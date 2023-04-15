@@ -1,7 +1,7 @@
 %{
 
 #include <stdio.h>
-#include "y.tab.h"
+#include "calc.tab.h"
 #include "calc.h"
 #include "hashtable.h"
 
@@ -59,6 +59,7 @@ else       return(ELSE);
 elif       return(ELIF);
 and        return(AND);
 or         return(OR);
+not        return(NOT);
 exit       return(EXIT);
 print      return(PRINT);
 println    return(PRINTLN);

@@ -150,7 +150,7 @@ char * str_ltrim( char * restrict str, const char * restrict delim )
     return str;
 }
 
-char * str_rest( char * restrict head, const char * restrict delim )
+char * str_tail( char * restrict head, const char * restrict delim )
 {
     while( !str_containschar(delim, *head) )
     {
@@ -826,7 +826,7 @@ void cfunc_input(reference_ptr ctx)
     intptr_t ref[] = REFERENCE_INIT;
     char buff[256];
     fgets( buff, 256, stdin );
-    str_rest( buff, "\n\r");
+    str_tail( buff, "\n\r");
     reference_create_str( ref, buff);
     reference_set_item( ctx, REFERENCE_n1, ref, 0 );
 }
@@ -918,12 +918,12 @@ void sesc_eval_argument( reference_ptr ref, sesc_context_ptr ctx, char * str)
 
         case '\"':
             ++str;
-            str_rest( str, "\"" );
+            str_tail( str, "\"" );
             return reference_create_str( ref, str );
 
         case '\'':
             ++str;
-            str_rest( str, "\'" );
+            str_tail( str, "\'" );
             return reference_create_str( ref, str );
 
         default:
@@ -950,24 +950,24 @@ intptr_t sesc_eval_string(sesc_context_ptr ctx, const char * str)
     const reference_ptr return_ref = REFERENCE_ZERO;
     const intptr_t len = strlen(str)+1;
     char tokenspace[len];
-    strncpy(tokenspace, str, len);
+    str_sncpy(tokenspace, len, str, -1);
     char* varname = str_ltrim(tokenspace, " ");
-    char* funcname = str_rest( varname, "=" );
+    char* funcname = str_tail( varname, "=" );
     if( NULL == funcname )
     {
         funcname =  varname;
         varname = NULL;
     }
-    char* argument = str_rest( funcname, "(" );
-    str_rest( argument, ")" );
-    char* arguments = str_rest( argument, "," );
+    char* argument = str_tail( funcname, "(" );
+    str_tail( argument, ")" );
+    char* arguments = str_tail( argument, "," );
     while( NULL != arguments )
     {
         sesc_eval_argument( ref, ctx, argument);
         reference_create_int( key_ref, idx++ );
         reference_set_item( ctx, key_ref, ref, 0);
         argument = arguments;
-        arguments = str_rest( argument, "," );
+        arguments = str_tail( argument, "," );
     }
     reference_create_int( ref, atoi(argument) );
     reference_create_int( key_ref, idx++ );

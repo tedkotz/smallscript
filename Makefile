@@ -1,21 +1,24 @@
 
+CFLAGS = -Wall -Wno-unused-function -Wno-main
+#-m32 -march=i686
 
-calc: y.tab.c lex.yy.c calc.h smallscript.h hashtable.c
-	gcc -Wall -Wno-unused-function -o calc y.tab.c lex.yy.c hashtable.c
+all: calc smallscript hashtest
 
-y.tab.c y.tab.h: calc.yy
-	yacc -d -Wno-yacc calc.yy
+calc: calc.tab.c calc.lex.c calc.h smallscript.h hashtable.c Makefile
+	gcc $(CFLAGS) -o calc calc.tab.c calc.lex.c hashtable.c
 
-lex.yy.c: calc.lex
-	lex calc.lex
+calc.tab.c calc.tab.h: calc.yy Makefile
+	yacc -d -b calc -Wno-yacc -Wcounterexamples calc.yy
 
-smallscript: main.c smallc.h smallscript.c smallscript.h hashtable.c
-	gcc -Wall -Wno-main -m32 -o smallscript main.c hashtable.c
-	#gcc -Wall -Wno-main -o smallscript main.c smallscript.c
-	#gcc -Wall -Wno-main -m32 -march=i686 -o smallscript main.c smallscript.c
+calc.lex.c: calc.lex Makefile
+	lex -o calc.lex.c calc.lex
 
-hashtest: hashtable.c hashtable.h smallc.h
-	gcc -Wall -Wno-main -DHASHTEST -m32 -o hashtest hashtable.c
+smallscript: main.c smallc.h smallscript.c smallscript.h hashtable.c Makefile
+	gcc $(CFLAGS) -o smallscript main.c hashtable.c
+	#gcc $(CFLAGS) -o smallscript main.c smallscript.c
+
+hashtest: hashtable.c hashtable.h smallc.h Makefile
+	gcc $(CFLAGS) -DHASHTEST -o hashtest hashtable.c
 
 clean-all:
 	git clean -f

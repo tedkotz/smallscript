@@ -3,7 +3,7 @@
 #include"calc.h"
 #include"hashtable.h"
 #include"smallscript.h"
-#include "y.tab.h"
+#include "calc.tab.h"
 
 sesc_context *ctx = NULL;
 intptr_t sizeofbuffer = 2;
@@ -16,8 +16,9 @@ char * buffer = NULL;
 %union { intptr_t ref[2]; }
 
 
-%token SYMBOL NUMBER STRING BOOL NONE BYTES FOR WHILE IN IF ELSE ELIF AND OR EXIT PRINT PRINTLN
+%token SYMBOL NUMBER STRING BOOL NONE BYTES FOR WHILE IN IF ELSE ELIF AND OR NOT XOR EXIT PRINT PRINTLN
 
+%right '='
 %left '|'
 %left '&'
 %left '+' '-'
