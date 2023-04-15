@@ -51,15 +51,17 @@ char hexdigit( char c )
     return(STRING);
     }
 
-for    return(FOR);
-while  return(WHILE);
-in     return(IN);
-if     return(IF);
-else   return(ELSE);
-elif   return(ELIF);
-and    return(AND);
-or     return(OR);
-exit   return(EXIT);
+for        return(FOR);
+while      return(WHILE);
+in         return(IN);
+if         return(IF);
+else       return(ELSE);
+elif       return(ELIF);
+and        return(AND);
+or         return(OR);
+exit       return(EXIT);
+print      return(PRINT);
+println    return(PRINTLN);
 
 False {
     reference_init( yylval.ref );

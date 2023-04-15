@@ -6,6 +6,8 @@
 #include "y.tab.h"
 
 sesc_context *ctx = NULL;
+intptr_t sizeofbuffer = 2;
+char * buffer = NULL;
 
 %}
 
@@ -14,7 +16,7 @@ sesc_context *ctx = NULL;
 %union { intptr_t ref[2]; }
 
 
-%token NUMBER SYMBOL EXIT STRING FOR WHILE IN IF ELSE ELIF BOOL NONE AND OR BYTES
+%token SYMBOL NUMBER STRING BOOL NONE BYTES FOR WHILE IN IF ELSE ELIF AND OR EXIT PRINT PRINTLN
 
 %left '|'
 %left '&'
@@ -44,8 +46,36 @@ list:                       /*empty */
 
 stat:    expr
          {
-           printf("%s\n", reference_extract_str($1));
-           reference_clear($1);
+            // free the expression.
+            reference_clear($1);
+         }
+         |
+         PRINT '[' expr ']'
+         {
+            intptr_t size = reference_extract_str(buffer, sizeofbuffer, $3 );
+            if ( (size + 2) > sizeofbuffer )
+            {
+                sizeofbuffer = size * 2;
+                buffer = realloc ( buffer, sizeofbuffer);
+                size = reference_extract_str(buffer, sizeofbuffer, $3 );
+            }
+            fputs( buffer, stdout );
+            reference_clear($3);
+         }
+         |
+         PRINTLN '[' expr ']'
+         {
+            intptr_t size = reference_extract_str(buffer, sizeofbuffer, $3 );
+            if ( (size + 2) > sizeofbuffer )
+            {
+                sizeofbuffer = size * 2;
+                buffer = realloc ( buffer, sizeofbuffer);
+                size = reference_extract_str(buffer, sizeofbuffer, $3 );
+            }
+            buffer[size++]='\n';
+            buffer[size++]='\0';
+            fputs( buffer, stdout );
+            reference_clear($3);
          }
          ;
 
@@ -145,6 +175,9 @@ expr:    '(' expr ')'
 int main(int argc, char** argv)
 {
     sesc_attr *attr=NULL;
+
+    buffer = malloc( sizeofbuffer );
+
     attr = sesc_attr_create();
     ctx = sesc_context_create(attr);
     sesc_attr_destroy(attr);

@@ -124,7 +124,93 @@ intptr_t max_seed = 0;
 
 /* Functions *****************************************************************/
 
+/** String manipulation ******************************************************/
+bool str_containschar(const char * restrict str, char c )
+{
+    while( *str != '\0' )
+    {
+        if (*str++ == c)
+        {
+            return true;
+        }
+    }
+    return false;
+}
 
+char * str_ltrim( char * restrict str, const char * restrict delim )
+{
+    while( str_containschar( delim, *str) )
+    {
+        ++str;
+    }
+    if (*str == '\0')
+    {
+        return NULL;
+    }
+    return str;
+}
+
+char * str_rest( char * restrict head, const char * restrict delim )
+{
+    while( !str_containschar(delim, *head) )
+    {
+        if (*head++ == '\0')
+        {
+            return NULL;
+        }
+    }
+    *head++ = '\0';
+    return head;
+}
+
+/**
+ * str_sncpy is like strncpy, with snprintf semantics.
+ * Thus it is very similar to snprintf( dst, dst_max_sz, "%"src_max_sz"s", src )
+ *
+ * @param dst pointer to the character array to copy to
+ * @param dst_max_sz the size of the destination buffer
+ * @param src pointer to the character array to copy from
+ * @param src_max_sz maximum number of characters in src, ignored if negative
+ *
+ * @return number of characters (not including the terminating null character)
+ * which would have been written to buffer if dst_max_sz was ignored.
+ */
+intptr_t str_sncpy ( char* restrict dst, intptr_t dst_max_sz, const char* restrict src, intptr_t src_max_sz )
+{
+    intptr_t count = 0;
+    const intptr_t max_copies = (dst == NULL) ? 0 :
+        (((src_max_sz >= 0) && (src_max_sz < dst_max_sz)) ? src_max_sz : (dst_max_sz-1));
+
+    while( (count<max_copies)  &&
+           (*src != '\0') )
+    {
+        *dst++ = *src++;
+        ++count;
+    }
+    if( max_copies > 0 )
+    {
+        *dst='\0';
+    }
+    if(src_max_sz >= 0)
+    {
+        while( (count<src_max_sz) &&
+               (*src++ != '\0') )
+        {
+            ++count;
+        }
+    }
+    else
+    {
+        while(*src++ != '\0')
+        {
+            ++count;
+        }
+    }
+    return count;
+}
+
+
+/** Reference Creation Functions *********************************************/
 void refable_header_init( refable_ptr data )
 {
    data[refable_refcnt_idx]=0;
@@ -339,65 +425,72 @@ const char* reference_extract_bytes( const reference_ptr ref, intptr_t* return_l
     return (char*)ref;
 }
 
-
-// TKOTZ switch extract String to snprintf semantics
-const char* reference_extract_str( const reference_ptr ref )
+/**
+ * Copies the string representation of reference to buffer with snprintf semantics.
+ *
+ * @param buffer pointer to the character array to copy to
+ * @param bufsz the size of the destination buffer
+ * @param ref pointer to the reference to build string for
+ *
+ * @return number of characters (not including the terminating null character)
+ * which would have been written to buffer if bufsz was ignored, or a negative
+ * value if an encoding error (for string and character conversion specifiers) occurred
+ */
+intptr_t reference_extract_str( char* restrict buffer, intptr_t bufsz, const reference_ptr ref )
 {
     switch (ref[ref_val_head])
     {
         case SESC_TYPE_NONE:
         {
-            return "None";
+            return str_sncpy(buffer, bufsz, "None", -1);
         }
 
         case SESC_TYPE_BOOL  :
         {
             if(ref[ref_val_data])
             {
-                return "True";
+                return str_sncpy(buffer, bufsz, "True", -1);
             }
             else
             {
-                return "False";
+                return str_sncpy(buffer, bufsz, "False", -1);
             }
         }
 
         case SESC_TYPE_INT   :
         {
-            // TKOTZ - This is bad
-            static char returnVal[SIZEOFINT*3+1];
-            snprintf( returnVal, sizeof(returnVal), "%"PRIdPTR, ref[ref_val_data] );
-            return returnVal;
-            //return "int";
+            return snprintf(buffer, bufsz, "%"PRIdPTR, ref[ref_val_data] );
         }
         case SESC_TYPE_STR   :
         {
             refable_ptr data=(refable_ptr)ref[ref_val_data];
-            return (char*)&data[refable_bytes_data_idx];
+            return str_sncpy(buffer, bufsz,
+                           (char*)&data[refable_bytes_data_idx],
+                           data[refable_bytes_len_idx]);
         }
         case SESC_TYPE_BYTES :
         {
-            return "bytes";
+            return str_sncpy(buffer, bufsz, "bytes", -1);
         }
         case SESC_TYPE_OBJ   :
         {
-            return "object";
+            return str_sncpy(buffer, bufsz, "object", -1);
         }
         case SESC_TYPE_LIST  :
         {
-            return "list";
+            return str_sncpy(buffer, bufsz, "list", -1);
         }
         case SESC_TYPE_FUNC  :
         {
-            return "func";
+            return str_sncpy(buffer, bufsz, "func", -1);
         }
         case SESC_TYPE_CFUNC  :
         {
-            return "extern";
+            return str_sncpy(buffer, bufsz, "extern", -1);
         }
     }
     fputs("reference_extract_str():Unknown Type", stderr);
-    return "Unknown Type";
+    return -1;
 }
 
 intptr_t reference_extract_int(const reference_ptr ref )
@@ -693,45 +786,6 @@ const reference_ptr reference_get_item( const reference_ptr object_ref, const re
 }
 
 /*****************************************************************************/
-/** String manipulation ******************************************************/
-bool charinstr( char c, const char * delim )
-{
-    while( *delim != '\0' )
-    {
-        if (*delim++ == c)
-        {
-            return true;
-        }
-    }
-    return false;
-}
-
-char * str_ltrim( char * str, const char * delim )
-{
-    while( charinstr(*str, delim) )
-    {
-        ++str;
-    }
-    if (*str == '\0')
-    {
-        return NULL;
-    }
-    return str;
-}
-
-char * str_rest( char * head, const char * delim )
-{
-    while( !charinstr(*head, delim) )
-    {
-        if (*head++ == '\0')
-        {
-            return NULL;
-        }
-    }
-    *head++ = '\0';
-    return head;
-}
-
 /** Context and Calling ******************************************************/
 void cfunc_add(reference_ptr ctx)
 {
@@ -753,13 +807,18 @@ void cfunc_sub(reference_ptr ctx)
 
 void cfunc_print(reference_ptr ctx)
 {
-    const char * str = reference_extract_str(reference_get_item(ctx, REFERENCE_1, 0));
+    const reference_ptr str_ref = reference_get_item(ctx, REFERENCE_1, 0 );
     intptr_t concat = reference_extract_int(reference_get_item(ctx, REFERENCE_2, 0));
-    fputs( str, stdout );
+    // plus 2 : 1 for the null and one optionally for the newline
+    const intptr_t str_size = reference_extract_str(NULL, 0, str_ref )+2;
+    char str[str_size];
+    intptr_t size = reference_extract_str(str, str_size, str_ref );
     if( !concat )
     {
-        fputs( "\n", stdout );
+        str[size++]='\n';
+        str[size++]='\0';
     }
+    fputs( str, stdout );
 }
 
 void cfunc_input(reference_ptr ctx)
@@ -943,19 +1002,19 @@ intptr_t sesc_get_int_by_name(sesc_context_ptr ctx, const char* name)
     return returnVal;
 }
 
-const char* sesc_get_string_by_idx(sesc_context_ptr ctx, intptr_t idx)
+intptr_t sesc_get_string_by_idx(char* restrict buffer, intptr_t bufsz, sesc_context_ptr ctx, intptr_t idx)
 {
     intptr_t key_ref[] = REFERENCE_INIT;
     reference_create_int( key_ref, idx );
-    return reference_extract_str(reference_get_item(ctx, key_ref, 0));
+    return reference_extract_str(buffer, bufsz, reference_get_item(ctx, key_ref, 0));
     // int references don't have to be cleaned up.
 }
 
-const char* sesc_get_string_by_name(sesc_context_ptr ctx, const char* name)
+intptr_t sesc_get_string_by_name(char* restrict buffer, intptr_t bufsz, sesc_context_ptr ctx, const char* name)
 {
     intptr_t key_ref[] = REFERENCE_INIT;
     reference_create_str( key_ref, name );
-    const char* returnVal = reference_extract_str(walk_scope_get_item(ctx, key_ref));
+    intptr_t returnVal = reference_extract_str(buffer, bufsz, walk_scope_get_item(ctx, key_ref));
     reference_clear(key_ref);
     return returnVal;
 }
@@ -1066,10 +1125,13 @@ void main()
     intptr_t i=0;
     struct mallinfo mi;
     const int num_strs = sizeof(strs)/sizeof(strs[0]);
-    //reference_ptr refptr;
+    const reference_ptr refptr;
     intptr_t ref[] = REFERENCE_INIT;
     intptr_t key_ref[] = REFERENCE_INIT;
     intptr_t htable[]  = REFERENCE_INIT;
+    intptr_t sizeofoutputbuffer = 2;
+    char * outputbuffer = NULL;
+    intptr_t neededspace;
 
 
     for( int i=0; i < num_strs; ++i )
@@ -1089,6 +1151,11 @@ void main()
     mi = mallinfo();
     printf("inuse blocks: %d\n", mi.uordblks);
 
+    outputbuffer = malloc( sizeofoutputbuffer );
+
+    mi = mallinfo();
+    printf("inuse blocks: %d\n", mi.uordblks);
+
     reference_create_obj( htable );
 
     mi = mallinfo();
@@ -1104,7 +1171,15 @@ void main()
     for( i=0; i < num_strs; ++i )
     {
         reference_create_str( key_ref, strs[i] );
-        printf( "a.%s = \"%s\"\n", strs[i], reference_extract_str( reference_get_item(htable, key_ref, 0 ) ) );
+        refptr = reference_get_item(htable, key_ref, 0 );
+        neededspace = reference_extract_str(outputbuffer, sizeofoutputbuffer, refptr );
+        if ( (neededspace + 1) > sizeofoutputbuffer )
+        {
+            sizeofoutputbuffer = neededspace * 2;
+            outputbuffer = realloc ( outputbuffer, sizeofoutputbuffer);
+            neededspace = reference_extract_str(outputbuffer, sizeofoutputbuffer, refptr );
+        }
+        printf( "a.%s = \"%s\"\n", strs[i],  outputbuffer);
     }
 
     for( i=5; i < num_strs; ++i )
@@ -1117,13 +1192,29 @@ void main()
     for( i=0; i < num_strs; ++i )
     {
         reference_create_str( key_ref, strs[i] );
-        printf( "a.%s = \"%s\"\n", strs[i], reference_extract_str( reference_get_item(htable, key_ref, 0 ) ) );
+        refptr = reference_get_item(htable, key_ref, 0 );
+        neededspace = reference_extract_str(outputbuffer, sizeofoutputbuffer, refptr );
+        if ( (neededspace + 1) > sizeofoutputbuffer )
+        {
+            sizeofoutputbuffer = neededspace * 2;
+            outputbuffer = realloc ( outputbuffer, sizeofoutputbuffer);
+            neededspace = reference_extract_str(outputbuffer, sizeofoutputbuffer, refptr );
+        }
+        printf( "a.%s = \"%s\"\n", strs[i],  outputbuffer);
     }
 
     for( i=0; i < 10; ++i )
     {
         reference_create_int( key_ref, i );
-        printf( "a[%d] = \"%s\"\n", (int)i, reference_extract_str( reference_get_item(htable, key_ref, 0 ) ) );
+        refptr = reference_get_item(htable, key_ref, 0 );
+        neededspace = reference_extract_str(outputbuffer, sizeofoutputbuffer, refptr );
+        if ( (neededspace + 1) > sizeofoutputbuffer )
+        {
+            sizeofoutputbuffer = neededspace * 2;
+            outputbuffer = realloc ( outputbuffer, sizeofoutputbuffer);
+            neededspace = reference_extract_str(outputbuffer, sizeofoutputbuffer, refptr );
+        }
+        printf( "a[%d] = \"%s\"\n", (int)i, outputbuffer );
     }
 
     mi = mallinfo();
@@ -1151,7 +1242,15 @@ void main()
     for( i=0; i < 0xFF; ++i )
     {
         reference_create_int( key_ref, i );
-        printf( "a[%d] = \"%s\"\n", (int)i, reference_extract_str( reference_get_item(htable, key_ref, 0 ) ) );
+        refptr = reference_get_item(htable, key_ref, 0 );
+        neededspace = reference_extract_str(outputbuffer, sizeofoutputbuffer, refptr );
+        if ( (neededspace + 1) > sizeofoutputbuffer )
+        {
+            sizeofoutputbuffer = neededspace * 2;
+            outputbuffer = realloc ( outputbuffer, sizeofoutputbuffer);
+            neededspace = reference_extract_str(outputbuffer, sizeofoutputbuffer, refptr );
+        }
+        printf( "a[%d] = \"%s\"\n", (int)i, outputbuffer );
     }
 
     reference_clear( htable );
@@ -1160,8 +1259,10 @@ void main()
 
     reference_clear( ref );
     reference_clear( key_ref );
+    free( outputbuffer);
     mi = mallinfo();
     printf("inuse blocks: %d\n", mi.uordblks);
+
 }
 
 #endif // HASHTEST

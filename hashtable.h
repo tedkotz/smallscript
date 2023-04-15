@@ -4,7 +4,7 @@
 #include "smallc.h"
 
 #define SESC_TYPE_NONE          0
-#define reference_ptr  intptr_t*
+#define reference_ptr  intptr_t* restrict
 #define REFERENCE_INIT { SESC_TYPE_NONE, 0 }
 // intptr_t ref[] = REFERENCE_INIT;
 
@@ -24,7 +24,7 @@ void reference_set_item( reference_ptr object_ref, const reference_ptr key_ref, 
 const reference_ptr reference_get_item( const reference_ptr object_ref, const reference_ptr key_ref, char seed);
 
 intptr_t reference_extract_int(const reference_ptr ref );
-const char* reference_extract_str( const reference_ptr ref );
+intptr_t reference_extract_str( char* restrict buffer, intptr_t bufsz, const reference_ptr ref );
 
 
 #endif // HASHTABLE_H
