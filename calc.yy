@@ -14,7 +14,7 @@ sesc_context *ctx = NULL;
 %union { intptr_t ref[2]; }
 
 
-%token NUMBER SYMBOL EXIT
+%token NUMBER SYMBOL EXIT STRING FOR WHILE IN IF ELSE ELIF BOOL NONE AND OR BYTES
 
 %left '|'
 %left '&'
@@ -22,7 +22,7 @@ sesc_context *ctx = NULL;
 %left '*' '/' '%'
 %left UMINUS  /*supplies precedence for unary minus */
 
-%type <ref> SYMBOL NUMBER expr
+%type <ref> SYMBOL NUMBER STRING BYTES BOOL NONE expr
 
 
 %%                   /* beginning of rules section */
@@ -134,8 +134,11 @@ expr:    '(' expr ')'
              reference_clear( $1 );
          }
 
-         |
-         NUMBER
+         | NUMBER
+         | BOOL
+         | NONE
+         | BYTES
+         | STRING
          ;
 
 %%
