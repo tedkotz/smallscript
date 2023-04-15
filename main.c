@@ -29,7 +29,7 @@ int main( int argc, intptr_t* argv )
     sesc_eval_string(ctx, "name=input();");
     sesc_eval_string(ctx, "print('Hello ',1);");
     sesc_eval_string(ctx, "print(name,1);");
-    sesc_eval_string(ctx, "print('!!!',0);");
+    sesc_eval_string(ctx, "print(\"!!!\",0);");
 
     //REPL
     //char line[128];

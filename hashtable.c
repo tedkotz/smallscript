@@ -52,7 +52,6 @@
 //     intptr_t header
 //     intptr_t dataptr
 // }
-#define reference_ptr       intptr_t*
 #define ref_val_head        0
 #define ref_val_data        1
 #define reference_len       2
@@ -110,7 +109,6 @@ typedef void (*SESC_CFUNC_TYPE)(reference_ptr ctx);
 
 
 /* Data **********************************************************************/
-#define REFERENCE_INIT { SESC_TYPE_NONE, 0 }
 const intptr_t REFERENCE_NONE[] = REFERENCE_INIT;
 const intptr_t REFERENCE_ZERO[] = { SESC_TYPE_INT, 0 };
 const intptr_t REFERENCE_1[] = { SESC_TYPE_INT, 1 };
