@@ -1,6 +1,5 @@
 %{
 #include<stdio.h>
-#include<stdlib.h>
 #include"calc.h"
 #include"hashtable.h"
 #include"smallscript.h"
@@ -34,7 +33,7 @@ list:                       /*empty */
          |
         list EXIT
          {
-           exit(0);
+           return 0;
          }
          |
         list error ';'
@@ -114,33 +113,25 @@ expr:    '(' expr ')'
          |
          expr '|' expr
          {
-             intptr_t ref1[] = REFERENCE_INIT;
-             intptr_t ref3[] = REFERENCE_INIT;
-             reference_move( ref1, $1);
-             reference_move( ref3, $3);
              reference_init($$);
-             reference_create_int( $$, reference_extract_int(ref1)|reference_extract_int(ref3));
-             reference_clear(ref1);
-             reference_clear(ref3);
+             reference_create_int( $$, reference_extract_int($1)|reference_extract_int($3));
+             reference_clear($1);
+             reference_clear($3);
          }
          |
 
         '-' expr %prec UMINUS
          {
-             intptr_t ref[] = REFERENCE_INIT;
-             reference_move( ref, $2);
              reference_init($$);
-             reference_create_int( $$, -reference_extract_int(ref));
-             reference_clear(ref);
+             reference_create_int( $$, -reference_extract_int($2));
+             reference_clear($2);
          }
          |
          SYMBOL
          {
-             intptr_t key_ref[] = REFERENCE_INIT;
-             reference_move( key_ref, $1);
              reference_init($$);
-             reference_copy($$ , reference_get_item(ctx, key_ref, 0 ));
-             reference_clear( key_ref );
+             reference_copy($$ , reference_get_item(ctx, $1, 0 ));
+             reference_clear( $1 );
          }
 
          |
