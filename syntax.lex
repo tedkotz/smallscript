@@ -78,6 +78,10 @@ println    return(PRINTLN);
 \=\=       return(EQ);
 \!\=       return(NE);
 \>\=       return(GE);
+\/\/       return(FLOORDIV);
+\*\*       return(POWER);
+\<\<       return(LSHIFT);
+\>\>       return(RSHIFT);
 
 False {
     reference_init( yylval.ref );

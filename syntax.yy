@@ -19,15 +19,17 @@ char * buffer = NULL;
 %union { intptr_t ref[reference_len]; }
 
 
-%token SYMBOL NUMBER STRING BOOL NONE BYTES FOR WHILE IN IF ELSE ELIF AND OR NOT XOR EXIT PRINT PRINTLN LE EQ NE GE
+%token SYMBOL NUMBER STRING BOOL NONE BYTES FOR WHILE IN IF ELSE ELIF AND OR
+%token NOT XOR EXIT PRINT PRINTLN LE EQ NE GE FLOORDIV POWER LSHIFT RSHIFT
 
 %right '='
-%left '|'
-%left '&'
-%left '+' '-'
-%left '*' '/' '%'
 %left OR
 %left AND
+%left NOT
+%left LE EQ NE GE '<' '>'
+%left '+' '-' '^' '|'
+%left '*' '/' '%' FLOORDIV '&'
+%left POWER LSHIFT RSHIFT
 %left UNARY  /*supplies precedence for unary minus */
 %left '.'
 
