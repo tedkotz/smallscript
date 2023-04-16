@@ -1,8 +1,9 @@
 #ifndef SMALLSCRIPT_H
 #define SMALLSCRIPT_H
-
-//typedef struct sesc_attr sesc_attr;
-//typedef struct sesc_context sesc_context;
+/*
+ * typedef struct sesc_attr sesc_attr;
+ * typedef struct sesc_context sesc_context;
+ */
 typedef intptr_t sesc_attr;
 
 typedef intptr_t sesc_context;
@@ -15,7 +16,7 @@ extern intptr_t sesc_get_int_by_name(sesc_context* ctx, const char* name);
 extern void sesc_context_destroy(sesc_context* ctx);
 extern void sesc_attr_destroy(sesc_attr* ctx);
 
-
+/*
 // [ "ant", "is", "uncle"][1:3][0]
 // is
 
@@ -37,7 +38,8 @@ extern void sesc_attr_destroy(sesc_attr* ctx);
 // <object> ::= <lvalue> | '{' <objectbody> '}' | '{}'| <funccall>
 // <function> ::= <lvalue> | <funccall> | 'func' <varlist> { <body> }
 // <funccall> ::= <function> <list>
-// <biop> ::= [+-/*%^&] | '//' | '<<' | '>>'
+// <biop> ::= [+-/%*^&] | '//' | '<<' | '>>'
 // <uop> ::= [!~]
+*/
 
 #endif

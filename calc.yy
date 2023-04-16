@@ -3,6 +3,7 @@
 #include"sesc_lex.h"
 #include"hashtable.h"
 #include"smallscript.h"
+#include <malloc.h>
 
 
 void yyerror(char * s);
@@ -11,6 +12,7 @@ int yywrap(void);
 sesc_context *ctx = NULL;
 intptr_t sizeofbuffer = 2;
 char * buffer = NULL;
+struct mallinfo mi;
 
 %}
 
@@ -62,6 +64,9 @@ stat:    expr
             buffer[size++]='\0';
             fputs( buffer, stdout );
             reference_clear($1);
+            mi = mallinfo();
+            printf("inuse blocks: %d\n", mi.uordblks);
+
          }
          ;
 
@@ -158,9 +163,12 @@ expr:    '(' expr ')'
          ;
 
 %%
-int main(int argc, char** argv)
+int main(unused int argc, unused char** argv)
 {
     sesc_attr *attr=NULL;
+
+    mi = mallinfo();
+    printf("inuse blocks: %d\n", mi.uordblks);
 
     buffer = malloc( sizeofbuffer );
 
@@ -171,6 +179,9 @@ int main(int argc, char** argv)
     yyparse();
 
     sesc_context_destroy(ctx);
+
+    mi = mallinfo();
+    printf("inuse blocks: %d\n", mi.uordblks);
 
     return 0;
 }

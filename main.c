@@ -13,14 +13,17 @@ int main( int argc, intptr_t* argv )
     attr = sesc_attr_create();
     ctx = sesc_context_create(attr);
     sesc_eval_string(ctx, "b=add(1,2);");
-    //printf("1+2=%"PRIdPTR"\n", sesc_get_int_by_idx(ctx, -1));
+    /* printf("1+2=%"PRIdPTR"\n", sesc_get_int_by_idx(ctx, -1));
+     */
     sesc_eval_string(ctx, "print('1+2:',1);");
     sesc_eval_string(ctx, "print(b,0);");
     sesc_eval_string(ctx, "a=sub(2,5);");
-    //printf("2-5=%"PRIdPTR"\n", sesc_get_int_by_name(ctx, "a"));
+    /* printf("2-5=%"PRIdPTR"\n", sesc_get_int_by_name(ctx, "a"));
+     */
     sesc_eval_string(ctx, "print('2-5:',1);");
     sesc_eval_string(ctx, "print(a,0);");
-    //printf("b=%"PRIdPTR"\n", sesc_get_int_by_name(ctx, "b"));
+    /* printf("b=%"PRIdPTR"\n", sesc_get_int_by_name(ctx, "b"));
+     */
     sesc_eval_string(ctx, "print('b:',1);");
     sesc_eval_string(ctx, "print(b,0);");
     sesc_eval_string(ctx, "print(132,0);");
@@ -31,14 +34,15 @@ int main( int argc, intptr_t* argv )
     sesc_eval_string(ctx, "print(name,1);");
     sesc_eval_string(ctx, "print(\"!!!\",0);");
 
-    //REPL
-    //char line[128];
-    //while(sesc_context_active(ctx))
-    //{
-    //    fgets(line, 128, stdin);
-    //    sesc_eval_string(ctx, line);
-    //    //fputs( sesc_get_string( ctx, OUTPUT_BUFFER );
-    //}
+    /* REPL
+     * char line[128];
+     * while(sesc_context_active(ctx))
+     * {
+     *     fgets(line, 128, stdin);
+     *     sesc_eval_string(ctx, line);
+     *     //fputs( sesc_get_string( ctx, OUTPUT_BUFFER );
+     * }
+     */
 
     sesc_context_destroy(ctx);
     sesc_attr_destroy(attr);

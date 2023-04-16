@@ -36,9 +36,9 @@ char hexdigit( char c )
     #endif
     }
 
-[\0- ] ; // ignore whitespace
+[\0- ] ; /* ignore whitespace */
 
-\"(\\.|[^"\\])*\" { // String literal
+\"(\\.|[^"\\])*\" { /* String " literal */
     char* tmp=&yytext[1];
     while( *tmp != '"' )
     {
@@ -50,7 +50,7 @@ char hexdigit( char c )
     return(STRING);
     }
 
-\'(\\.|[^'\\])*\' { // String literal
+\'(\\.|[^'\\])*\' { /* String ' literal */
     char* tmp=&yytext[1];
     while( *tmp != '\'' )
     {
@@ -100,7 +100,7 @@ None {
     return(NONE);
     }
 
-\[#([0-9a-zA-Z][0-9a-zA-Z])+\] { // Bytes literal
+\[#([0-9a-zA-Z][0-9a-zA-Z])+\] { /* Bytes literal */
     intptr_t count=0;
     char* tmp=&yytext[2];
     char val;
@@ -114,7 +114,7 @@ None {
     return(BYTES);
     }
 
-[a-zA-Z_][a-zA-Z0-9_]* { // Symbol name
+[a-zA-Z_][a-zA-Z0-9_]* { /* Symbol name */
     reference_init( yylval.ref );
     reference_create_str( yylval.ref, yytext );
     return(SYMBOL);
@@ -132,7 +132,7 @@ None {
     return(NUMBER);
     }
 
-. { // Else pass characters as individual tokens
+. { /* Else pass characters as individual tokens */
     return(yytext[0]);
     }
 

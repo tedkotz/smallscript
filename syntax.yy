@@ -35,7 +35,8 @@ char * buffer = NULL;
 
 %type <ref> NUMBER SYMBOL STRING BYTES BOOL NONE expr
 
-//list object function bool none
+/* list object function bool none
+ */
 
 
 %%                   /* beginning of rules section */
@@ -52,7 +53,7 @@ body:                       /*empty */
 
 stat:    expr
          {
-            // free the expression.
+            /* free the expression. */
             reference_clear($1);
          }
          |
@@ -89,69 +90,71 @@ stat:    expr
              return 0;
          }
          ;
-//         |
-//         FOR SYMBOL IN list '{' body '}'
-//         |
-//         WHILE expr '{' body '}'
-//         |
-//         IF bool '{' body '}' ellist ELSE '{' body '}'
-//         |
-//         IF bool '{' body '}' ELSE '{' body '}'
-//         |
-//         IF bool '{' body '}' ellist
-//         |
-//         IF bool '{' body '}'
-
-// ellist:  ellist ELIF bool '{' body '}'
-//          |
-//          ELIF bool '{' body '}'
-//          ;
-//
-// lvalue:  SYMBOL
-//          |
-//          lvalue '.' SYMBOL
-//          |
-//          expr list
-//          ;
-//
-// bool:    lvalue
-//          |
-//          bool OR bool
-//          |
-//          bool AND bool
-//          |
-//          expr '<' expr
-//          |
-//          expr LE expr
-//          |
-//          expr EQ expr
-//          |
-//          expr NE expr
-//          |
-//          expr '>' expr
-//          |
-//          expr GE expr
-//          |
-//          TRUE
-//          |
-//          FALSE
-//          ;
-//
-// list:    '[' listbody ']'
-//          |
-//          '['']'
-//          |
-//          '[' expr ':' expr ':' expr ']'
-//          |
-//          '[' expr ':' expr ']'
-//          |
-//          '[' expr ']'
-//          |
-//          lvalue
-//          ;
-//
-// listbody: listbody ',' expr
-//          ;
+/*
+ *         |
+ *         FOR SYMBOL IN list '{' body '}'
+ *         |
+ *         WHILE expr '{' body '}'
+ *         |
+ *         IF bool '{' body '}' ellist ELSE '{' body '}'
+ *         |
+ *         IF bool '{' body '}' ELSE '{' body '}'
+ *         |
+ *         IF bool '{' body '}' ellist
+ *         |
+ *         IF bool '{' body '}'
+ *
+ * ellist:  ellist ELIF bool '{' body '}'
+ *          |
+ *          ELIF bool '{' body '}'
+ *          ;
+ *
+ * lvalue:  SYMBOL
+ *          |
+ *          lvalue '.' SYMBOL
+ *          |
+ *          expr list
+ *          ;
+ *
+ * bool:    lvalue
+ *          |
+ *          bool OR bool
+ *          |
+ *          bool AND bool
+ *          |
+ *          expr '<' expr
+ *          |
+ *          expr LE expr
+ *          |
+ *          expr EQ expr
+ *          |
+ *          expr NE expr
+ *          |
+ *          expr '>' expr
+ *          |
+ *          expr GE expr
+ *          |
+ *          TRUE
+ *          |
+ *          FALSE
+ *          ;
+ *
+ * list:    '[' listbody ']'
+ *          |
+ *          '['']'
+ *          |
+ *          '[' expr ':' expr ':' expr ']'
+ *          |
+ *          '[' expr ':' expr ']'
+ *          |
+ *          '[' expr ']'
+ *          |
+ *          lvalue
+ *          ;
+ *
+ * listbody: listbody ',' expr
+ *          ;
+ */
 
 expr:    '(' expr ')'
          {
@@ -247,7 +250,7 @@ expr:    '(' expr ')'
          |
          SYMBOL
          {
-             //lvalue
+             /* lvalue */
              reference_init($$);
              reference_copy($$ , reference_get_item(ctx, $1, 0 ));
              reference_clear( $1 );
@@ -261,7 +264,7 @@ expr:    '(' expr ')'
          ;
 
 %%
-int main(int argc, char** argv)
+int main(unused int argc, unused char** argv)
 {
     sesc_attr *attr=NULL;
 

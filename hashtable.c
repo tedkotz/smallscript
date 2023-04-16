@@ -3,11 +3,14 @@
 /* Includes ******************************************************************/
 #include "hashtable.h"
 
+
 /* Defines *******************************************************************/
 #define NONE_HASH 0
 
-// enum SESC_TYPE
-//#define SESC_TYPE_NONE          0
+/*
+ * enum SESC_TYPE
+ *#define SESC_TYPE_NONE          0
+ */
 #define SESC_TYPE_BOOL          1
 #define SESC_TYPE_INT           2
 #define SESC_TYPE_STR           3
@@ -17,15 +20,17 @@
 #define SESC_TYPE_FUNC          7
 #define SESC_TYPE_CFUNC         8
 
-        // case SESC_TYPE_NONE  :
-        // case SESC_TYPE_BOOL  :
-        // case SESC_TYPE_INT   :
-        // case SESC_TYPE_STR   :
-        // case SESC_TYPE_BYTES :
-        // case SESC_TYPE_OBJ   :
-        // case SESC_TYPE_LIST  :
-        // case SESC_TYPE_FUNC  :
-        // case SESC_TYPE_CFUNC  :
+/*
+ *        case SESC_TYPE_NONE  :
+ *        case SESC_TYPE_BOOL  :
+ *        case SESC_TYPE_INT   :
+ *        case SESC_TYPE_STR   :
+ *        case SESC_TYPE_BYTES :
+ *        case SESC_TYPE_OBJ   :
+ *        case SESC_TYPE_LIST  :
+ *        case SESC_TYPE_FUNC  :
+ *        case SESC_TYPE_CFUNC :
+ */
 
 #define SESC_TYPE_STATIC_STR    0x12
 #define SESC_TYPE_SUBTABLE      0x11
@@ -34,33 +39,40 @@
 #define NOT_A_VLA_SIZE 64
 
 /* Types *********************************************************************/
-// struct refable
+/* struct refable
+ */
 #define refable_ptr           intptr_t*
 #define refable_refcnt_idx    0
 #define refable_data_idx      1
 #define refable_header_size   (refable_data_idx*SIZEOFINT)
 
-// struct refable_str or refable_bytes {
-//     intptr_t refcnt
-//     intptr_t len
-//     char     data[]
-// }
+/*
+ * struct refable_str or refable_bytes {
+ *     intptr_t refcnt
+ *     intptr_t len
+ *     char     data[]
+ * }
+ */
 #define refable_bytes_len_idx       refable_data_idx
 #define refable_bytes_data_idx      (refable_data_idx+1)
 #define refable_bytes_header_size   (refable_bytes_data_idx*SIZEOFINT)
 
-// struct sesc_reference {
-//     intptr_t header
-//     intptr_t dataptr
-// }
+/*
+ * struct sesc_reference {
+ *     intptr_t header
+ *     intptr_t dataptr
+ * }
+ */
 #define ref_val_head        0
 #define ref_val_data        1
 #define reference_size     (reference_len*SIZEOFINT)
 
-// struct ht_item {
-//     sesc_reference key
-//     sesc_reference value
-// }
+/*
+ * struct ht_item {
+ *     sesc_reference key
+ *     sesc_reference value
+ * }
+ */
 #define ht_item_ptr intptr_t*
 #define ht_item_len 4
 #define ht_item_size (ht_item_len*SIZEOFINT)
@@ -69,35 +81,37 @@
 #define ht_item_val_head  2
 #define ht_item_val_data  3
 
-
-// struct refable_list or refable_object {
-//     intptr_t refcnt
-//     ht_item  table[htable_len]
-// }
-// CONFIG hash_bits should work from 2-8
-// 2 showed the minimum allocation for my large data sets
-// 8 was the fastest about 3x on my system
-// 3 was only slightly larger with a good bump in speed for "normal" data sets
-// Try profiling on your system with your data sets.
+/*
+ * struct refable_list or refable_object {
+ *     intptr_t refcnt
+ *     ht_item  table[htable_len]
+ * }
+ * CONFIG hash_bits should work from 2-8
+ * 2 showed the minimum allocation for my large data sets
+ * 8 was the fastest about 3x on my system
+ * 3 was only slightly larger with a good bump in speed for "normal" data sets
+ * Try profiling on your system with your data sets.
+ */
 #define hash_bits 3
 #define htable_len  (1 << hash_bits)
 #define refable_htable_data_idx  refable_data_idx
 #define refable_htable_idx_cnt   (refable_data_idx+(htable_len*ht_item_len))
 #define refable_htable_size      (refable_htable_idx_cnt*SIZEOFINT)
 
-
-// struct sesc_context {
-//     sesc_reference current_scope
-//     ??sesc_reference stack_list
-//     ??intptr_t       stack_ptr
-//  };
-// Calling conventions
-// The calling object is passed as the entries "0"
-// args are pushed as numbered entries left to right starting at 1
-// obj.method(a, b, c) -> [0] = obj, [1]=a, [2]=b, [3]=c
-// return values are stored as negative numbered entries left to right starting at -1
-// key "@parent" is next scope up.
-// key "@root" is top scope or is None if this is the global scope
+/*
+ * struct sesc_context {
+ *     sesc_reference current_scope
+ *     ??sesc_reference stack_list
+ *     ??intptr_t       stack_ptr
+ *  };
+ * Calling conventions
+ * The calling object is passed as the entries "0"
+ * args are pushed as numbered entries left to right starting at 1
+ * obj.method(a, b, c) -> [0] = obj, [1]=a, [2]=b, [3]=c
+ * return values are stored as negative numbered entries left to right starting at -1
+ * key "@parent" is next scope up.
+ * key "@root" is top scope or is None if this is the global scope
+ */
 #define sesc_context_ptr  reference_ptr
 #define sesc_context_len  reference_len
 #define sesc_context_size reference_size
@@ -247,33 +261,38 @@ void reference_clear( reference_ptr ref )
             }
             break;
         }
-        // case SESC_TYPE_FUNC  :
-        // {
-        //     refable_ptr tmp = (refable_ptr)ref[ref_val_data];
-        //     --(tmp[refable_refcnt_idx]);
-        //     if(tmp[refable_refcnt_idx] < 1)
-        //     {
-        //         //func_destroy(tmp);
-        //     }
-        //     break;
-        // }
+        /*
+         * case SESC_TYPE_FUNC  :
+         * {
+         *     refable_ptr tmp = (refable_ptr)ref[ref_val_data];
+         *     --(tmp[refable_refcnt_idx]);
+         *     if(tmp[refable_refcnt_idx] < 1)
+         *     {
+         *         func_destroy(tmp);
+         *     }
+         *     break;
+         * }
+         */
 
         case SESC_TYPE_STR   :
         case SESC_TYPE_BYTES :
         {
-            //simple free
+            /* Decrement ref count then free */
             refable_ptr tmp = (refable_ptr)ref[ref_val_data];
             --(tmp[refable_refcnt_idx]);
+            printf("ref count = %d\n", (int)tmp[refable_refcnt_idx]);
             if(tmp[refable_refcnt_idx] < 1)
             {
                 free(tmp);
             }
             break;
         }
-        // case SESC_TYPE_NONE  :
-        // case SESC_TYPE_BOOL  :
-        // case SESC_TYPE_INT   :
-        // case SESC_TYPE_CFUNC :
+        /*
+         * case SESC_TYPE_NONE  :
+         * case SESC_TYPE_BOOL  :
+         * case SESC_TYPE_INT   :
+         * case SESC_TYPE_CFUNC :
+         */
     }
     ref[ref_val_head]=SESC_TYPE_NONE;
     ref[ref_val_data]=0;
@@ -291,14 +310,16 @@ void reference_set_refable( reference_ptr dst_ref, SESC_TYPE val_head, refable_p
             case SESC_TYPE_OBJ   :
             case SESC_TYPE_LIST  :
             case SESC_TYPE_SUBTABLE:
-            // case SESC_TYPE_FUNC  :
+            /* case SESC_TYPE_FUNC  :
+             */
                 ++(val_data[refable_refcnt_idx]);
                 break;
-
-            // case SESC_TYPE_NONE  :
-            // case SESC_TYPE_BOOL  :
-            // case SESC_TYPE_INT   :
-            // case SESC_TYPE_CFUNC  :
+            /*
+             * case SESC_TYPE_NONE  :
+             * case SESC_TYPE_BOOL  :
+             * case SESC_TYPE_INT   :
+             * case SESC_TYPE_CFUNC :
+             */
         }
 
         reference_clear(dst_ref);
@@ -510,27 +531,29 @@ void reference_deep_copy( reference_ptr dst_ref, const reference_ptr src_ref )
         switch (src_ref[ref_val_head])
         {
             case SESC_TYPE_NONE  :
-                reference_clear(dst_ref);
+                return reference_clear(dst_ref);
 
             case SESC_TYPE_BOOL  :
             case SESC_TYPE_INT   :
-                // shallow copy works fine
+                /* shallow copy works fine */
                 return reference_copy( dst_ref, src_ref );
 
             case SESC_TYPE_OBJ   :
             case SESC_TYPE_LIST  :
             case SESC_TYPE_FUNC  :
             {
-                // TKOTZ - copy the objects someday?
-                // shallow copy works fine?
+                /*
+                 * TKOTZ - copy the objects someday?
+                 * shallow copy works fine?
+                 */
                 return reference_copy( dst_ref, src_ref );
             }
 
             case SESC_TYPE_STR   :
             case SESC_TYPE_BYTES :
             {
-                // copy the data
-                //refable_ptr data=(refable_ptr)ref[ref_val_data]
+                /* copy the data */
+                /* refable_ptr data=(refable_ptr)ref[ref_val_data] */
                 intptr_t len;
                 const char * bytes = reference_extract_bytes(src_ref, &len);
                 return reference_create_byteslike(dst_ref, bytes, len, src_ref[ref_val_head]);
@@ -587,16 +610,18 @@ void reference_call( reference_ptr parent_ctx, const reference_ptr callable/*, r
             SESC_CFUNC_TYPE func = (SESC_CFUNC_TYPE)callable[ref_val_data];
             func( parent_ctx );
         }
-        // case SESC_TYPE_NONE  :
-        // case SESC_TYPE_BOOL  :
-        // case SESC_TYPE_INT   :
-        // case SESC_TYPE_STR   :
-        // case SESC_TYPE_BYTES :
-        // case SESC_TYPE_OBJ   :
-        // case SESC_TYPE_LIST  :
-        // case SESC_TYPE_FUNC  :
-        //    intptr_t ctx[] = REFERENCE_INIT;
-        //    reference_create_object(ctx);
+        /*
+         * case SESC_TYPE_NONE  :
+         * case SESC_TYPE_BOOL  :
+         * case SESC_TYPE_INT   :
+         * case SESC_TYPE_STR   :
+         * case SESC_TYPE_BYTES :
+         * case SESC_TYPE_OBJ   :
+         * case SESC_TYPE_LIST  :
+         * case SESC_TYPE_FUNC  :
+         *    intptr_t ctx[] = REFERENCE_INIT;
+         *    reference_create_object(ctx);
+         */
     }
 }
 
@@ -605,14 +630,16 @@ void reference_call( reference_ptr parent_ctx, const reference_ptr callable/*, r
 
 static unsigned char hash_bytes( const char* data, intptr_t len, char seed )
 {
-    // Need a good 8-bit hash value. Let's try the family of CRCs.
-    // So let's use a 10-bit polynomial with the 8 seed bits being the middle terms
-    // Note the terms here are bit 6 represents x^0 and
-    // x^9 is assumed to be one by checking it before the shift
-    // poly    15  14  13  12  11  10  09  08  07  06  05  04  03  02  01  00
-    // seed        b7  b6  b5  b4  b3  b2  b1  b0
-    // 513<<6  1                                   1
-    // term    x^9 x^8 x^7 x^6 x^5 x^4 x^3 x^2 x^1 x^0
+    /*
+     * Need a good 8-bit hash value. Let's try the family of CRCs.
+     * So let's use a 10-bit polynomial with the 8 seed bits being the middle terms
+     * Note the terms here are bit 6 represents x^0 and
+     * x^9 is assumed to be one by checking it before the shift
+     * poly    15  14  13  12  11  10  09  08  07  06  05  04  03  02  01  00
+     * seed        b7  b6  b5  b4  b3  b2  b1  b0
+     * 513<<6  1                                   1
+     * term    x^9 x^8 x^7 x^6 x^5 x^4 x^3 x^2 x^1 x^0
+     */
     intptr_t poly = (513 << 6) + (seed << 7) ;
 
     intptr_t accum = 0xFF00;
@@ -623,8 +650,9 @@ static unsigned char hash_bytes( const char* data, intptr_t len, char seed )
         i=8;
         while(i-- > 0)
         {
-            // Might be faster on sys without native multiply or branch prediction
-            // if( accum & 0x8000 ) accum ^= poly;
+            /* Might be faster on sys without native multiply or branch prediction
+             * if( accum & 0x8000 ) accum ^= poly;
+             */
             accum ^= (poly * ((accum >> 15) & 1));
             accum <<= 1;
         }
@@ -632,8 +660,9 @@ static unsigned char hash_bytes( const char* data, intptr_t len, char seed )
     i=8;
     while(i-- > 0)
     {
-        // Might be faster on sys without native multiply or branch prediction
-        // if( accum & 0x8000 ) accum ^= poly;
+        /* Might be faster on sys without native multiply or branch prediction
+         * if( accum & 0x8000 ) accum ^= poly;
+         */
         accum ^= (poly * ((accum >> 15) & 1));
         accum <<= 1;
     }
@@ -654,22 +683,22 @@ unsigned char reference_hash( const reference_ptr ref, char seed )
         case SESC_TYPE_OBJ   :
         case SESC_TYPE_LIST  :
         case SESC_TYPE_FUNC  :
-        case SESC_TYPE_CFUNC  :
+        case SESC_TYPE_CFUNC :
         {
-            // hash the reference
+            /* hash the reference */
             return hash_bytes( (const char*)ref, reference_size, seed);
         }
 
         case SESC_TYPE_STR   :
         case SESC_TYPE_BYTES :
         {
-            // hash the data
+            /* hash the data  */
             refable_ptr data=(refable_ptr)ref[ref_val_data];
             return hash_bytes( (char*)&data[refable_bytes_data_idx], data[refable_bytes_len_idx], seed);
         }
     }
     fputs("reference_hash():Unknown Type", stderr);
-    // hash the reference
+    /* hash the reference */
     return hash_bytes( (const char*)ref, reference_size, seed );
 }
 
@@ -681,17 +710,19 @@ void reference_set_item( reference_ptr object_ref, const reference_ptr key_ref, 
         case SESC_TYPE_OBJ   :
         case SESC_TYPE_LIST  :
             seed = 0;
-            // intentional fall thru
+            /* intentional fall thru */
         case SESC_TYPE_SUBTABLE:
             data=(refable_ptr)object_ref[ref_val_data];
             break;
-        // case SESC_TYPE_NONE  :
-        // case SESC_TYPE_BOOL  :
-        // case SESC_TYPE_INT   :
-        // case SESC_TYPE_STR   :
-        // case SESC_TYPE_BYTES :
-        // case SESC_TYPE_FUNC  :
-        // case SESC_TYPE_CFUNC  :
+        /*
+         * case SESC_TYPE_NONE  :
+         * case SESC_TYPE_BOOL  :
+         * case SESC_TYPE_INT   :
+         * case SESC_TYPE_STR   :
+         * case SESC_TYPE_BYTES :
+         * case SESC_TYPE_FUNC  :
+         * case SESC_TYPE_CFUNC :
+         */
         default:
         return;
     }
@@ -700,7 +731,7 @@ void reference_set_item( reference_ptr object_ref, const reference_ptr key_ref, 
 
     if (entry[ht_item_val_head] == SESC_TYPE_NONE)
     {
-        // Empty
+        /* Empty */
         if( src_ref[ref_val_head] != SESC_TYPE_NONE )
         {
             reference_copy( &entry[ht_item_val_head], src_ref);
@@ -709,17 +740,17 @@ void reference_set_item( reference_ptr object_ref, const reference_ptr key_ref, 
     }
     else if (entry[ht_item_val_head] == SESC_TYPE_SUBTABLE)
     {
-        // check subtable
+        /* check subtable */
         return reference_set_item( &entry[ht_item_val_head], key_ref, src_ref, seed+1);
     }
     else if (0 == reference_cmp(key_ref, &entry[ht_item_key_head]))
     {
-        // Replace
+        /* Replace */
         reference_copy( &entry[ht_item_val_head], src_ref);
     }
     else if (seed+1 != 0)
     {
-        // Collision
+        /* Collision */
         if (seed > max_seed)
         {
             max_seed = seed;
@@ -752,17 +783,19 @@ const reference_ptr reference_get_item( const reference_ptr object_ref, const re
         case SESC_TYPE_OBJ   :
         case SESC_TYPE_LIST  :
             seed = 0;
-            // intentional fall thru
+            /* intentional fall thru */
         case SESC_TYPE_SUBTABLE:
             data=(refable_ptr)object_ref[ref_val_data];
             break;
-        // case SESC_TYPE_NONE  :
-        // case SESC_TYPE_BOOL  :
-        // case SESC_TYPE_INT   :
-        // case SESC_TYPE_STR   :
-        // case SESC_TYPE_BYTES :
-        // case SESC_TYPE_FUNC  :
-        // case SESC_TYPE_CFUNC  :
+        /*
+         * case SESC_TYPE_NONE  :
+         * case SESC_TYPE_BOOL  :
+         * case SESC_TYPE_INT   :
+         * case SESC_TYPE_STR   :
+         * case SESC_TYPE_BYTES :
+         * case SESC_TYPE_FUNC  :
+         * case SESC_TYPE_CFUNC :
+         */
         default:
         return REFERENCE_NONE;
     }
@@ -771,12 +804,12 @@ const reference_ptr reference_get_item( const reference_ptr object_ref, const re
 
     if (entry[ht_item_val_head] == SESC_TYPE_SUBTABLE)
     {
-        // Check subtable
+        /* Check subtable */
         return reference_get_item( &entry[ht_item_val_head], key_ref, seed+1);
     }
     else if (0 == reference_cmp(key_ref, &entry[ht_item_key_head]))
     {
-        // Found
+        /* Found */
         return &entry[ht_item_val_head];
     }
     else
@@ -812,7 +845,7 @@ void cfunc_print(reference_ptr ctx)
     const reference_ptr str_ref = reference_get_item(ctx, REFERENCE_1, 0 );
     intptr_t concat = reference_extract_int(reference_get_item(ctx, REFERENCE_2, 0));
     intptr_t size = reference_extract_str(str, NOT_A_VLA_SIZE, str_ref );
-    // plus 2 : 1 for the null and one optionally for the newline
+    /* plus 2 : 1 for the null and one optionally for the newline */
     intptr_t str_size = size + 2 ;
     if( str_size > NOT_A_VLA_SIZE )
     {
@@ -855,11 +888,11 @@ sesc_attr_ptr sesc_attr_create(void)
     return NULL;
 }
 
-void sesc_attr_destroy(sesc_attr_ptr ctx)
+void sesc_attr_destroy(unused sesc_attr_ptr ctx)
 {
 }
 
-sesc_context_ptr sesc_context_create(sesc_attr_ptr attr)
+sesc_context_ptr sesc_context_create(unused sesc_attr_ptr attr)
 {
     intptr_t ref[] = REFERENCE_INIT;
     intptr_t key_ref[] = REFERENCE_INIT;
@@ -908,7 +941,7 @@ const reference_ptr walk_scope_get_item( const reference_ptr ctx, const referenc
 void sesc_eval_argument( reference_ptr ref, sesc_context_ptr ctx, char * str)
 {
     intptr_t key_ref[] = REFERENCE_INIT;
-    // Supports string["'], int[-+0-9], variable[_a-zA-Z]
+    /* Supports string["'], int[-+0-9], variable[_a-zA-Z] */
     switch ( str[0] )
     {
         case '+':
@@ -951,9 +984,10 @@ void sesc_eval_argument( reference_ptr ref, sesc_context_ptr ctx, char * str)
 
 intptr_t sesc_eval_string(sesc_context_ptr ctx, const char * str)
 {
-    // TODO
-    // simple expression
-    // ([_a-zA-z][_a-zA-z0-9]*)=([_a-zA-z][_a-zA-z0-9]*)\[[0-9]+(,[0-9]+)*\];
+    /* TODO
+     * simple expression
+     * ([_a-zA-z][_a-zA-z0-9]*)=([_a-zA-z][_a-zA-z0-9]*)\[[0-9]+(,[0-9]+)*\];
+     */
     char buff[NOT_A_VLA_SIZE];
     char * tokenspace=buff;
     intptr_t idx = 1;
@@ -1009,7 +1043,7 @@ intptr_t sesc_get_int_by_idx(sesc_context_ptr ctx, intptr_t idx)
     intptr_t key_ref[] = REFERENCE_INIT;
     reference_create_int( key_ref, idx );
     return reference_extract_int(reference_get_item(ctx, key_ref, 0));
-    // int references don't have to be cleaned up.
+    /* int references don't have to be cleaned up. */
 }
 
 intptr_t sesc_get_int_by_name(sesc_context_ptr ctx, const char* name)
@@ -1026,7 +1060,7 @@ intptr_t sesc_get_string_by_idx(char* restrict buffer, intptr_t bufsz, sesc_cont
     intptr_t key_ref[] = REFERENCE_INIT;
     reference_create_int( key_ref, idx );
     return reference_extract_str(buffer, bufsz, reference_get_item(ctx, key_ref, 0));
-    // int references don't have to be cleaned up.
+    /* int references don't have to be cleaned up. */
 }
 
 intptr_t sesc_get_string_by_name(char* restrict buffer, intptr_t bufsz, sesc_context_ptr ctx, const char* name)
@@ -1049,13 +1083,14 @@ void sesc_context_destroy(sesc_context_ptr ctx)
 
 
 
-// TODO - TKOTZ
-// Needs Callable functionality
-// Needs parser
-// Needs way to detect circular references
-//   scan contents of htable for itself?
-//   prevent an htable from containing itselfas key or value?
-// Needs iterators
+/* TODO - TKOTZ
+ * Needs Callable functionality
+ * Needs parser
+ * Needs way to detect circular references
+ *   scan contents of htable for itself?
+ *   prevent an htable from containing itselfas key or value?
+ * Needs iterators
+ */
 
 /*****************************************************************************/
 /** Main     *****************************************************************/
@@ -1153,7 +1188,7 @@ void main()
     intptr_t neededspace;
 
 
-    for( int i=0; i < num_strs; ++i )
+    for( i=0; i < num_strs; ++i )
     {
         int len = strlen(strs[i]);
         printf( "%02X : %02X : %02X : %s\n", (int)hash_bytes( strs[i], len, 0), (int)hash_bytes( strs[i], len, 1), (int)hash_bytes( strs[i], len, 2), strs[i]);
@@ -1247,7 +1282,9 @@ void main()
     }
     printf("Done strings by index.\n");
 
-    reference_create_str( ref, "Ted" );
+    /* reference_create_str( ref, "SESC" );
+     */
+    reference_create_int( ref, 4 );
     for( i=num_strs; i < 0xFFFFF; ++i )
     {
         reference_create_int( key_ref, i );
@@ -1284,7 +1321,7 @@ void main()
 
 }
 
-#endif // HASHTEST
+#endif /* HASHTEST */
 
 
 
