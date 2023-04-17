@@ -22,16 +22,16 @@ char * buffer = NULL;
 %token SYMBOL NUMBER STRING BOOL NONE BYTES FOR WHILE IN IF ELSE ELIF AND OR
 %token NOT XOR EXIT PRINT PRINTLN LE EQ NE GE FLOORDIV POWER LSHIFT RSHIFT
 
-%right '='
-%left OR
-%left AND
-%left NOT
-%left LE EQ NE GE '<' '>'
-%left '+' '-' '^' '|'
-%left '*' '/' '%' FLOORDIV '&'
-%left POWER LSHIFT RSHIFT
-%left UNARY  /*supplies precedence for unary minus */
-%left '.'
+%right '='                                  /* Assignment */
+%left OR                                    /* Logical sums */
+%left AND                                   /* Logical products */
+%left NOT                                   /* Logical unaries */
+%left LE EQ NE GE '<' '>'                   /* Arithmetic to Logical comparators*/
+%left '+' '-' '^' '|'                       /* Arithmetic sums */
+%left '*' '/' '%' FLOORDIV '&'              /* Arithmetic products */
+%left POWER LSHIFT RSHIFT                   /* Arithmetic exponentials */
+%left UNARY                                 /* Arithmetic unaries */
+%left '.'                                   /* Binding */
 
 %type <ref> NUMBER SYMBOL STRING BYTES BOOL NONE expr
 

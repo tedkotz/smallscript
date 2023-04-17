@@ -40,6 +40,8 @@ list:                       /*empty */
          |
         list stat '\n'
          |
+        list stat ';' '\n'
+         |
         list EXIT
          {
            return 0;
