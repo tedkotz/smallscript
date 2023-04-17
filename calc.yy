@@ -25,10 +25,8 @@ struct mallinfo mi;
 %token NOT XOR EXIT PRINT PRINTLN LE EQ NE GE FLOORDIV POWER LSHIFT RSHIFT
 
 %right '='
-%left '|'
-%left '&'
-%left '+' '-'
-%left '*' '/' '%'
+%left '+' '-' '|'
+%left '*' '/' '%' '&'
 %left UMINUS  /*supplies precedence for unary minus */
 
 %type <ref> SYMBOL NUMBER STRING BYTES BOOL NONE expr

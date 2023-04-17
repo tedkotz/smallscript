@@ -1084,12 +1084,6 @@ void sesc_context_destroy(sesc_context_ptr ctx)
 
 
 /* TODO - TKOTZ
- * Needs Callable functionality
- * Needs parser
- * Needs way to detect circular references
- *   scan contents of htable for itself?
- *   prevent an htable from containing itselfas key or value?
- * Needs iterators
  */
 
 /*****************************************************************************/
